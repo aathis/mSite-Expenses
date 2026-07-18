@@ -68,7 +68,6 @@ function MSiteTracker() {
 
   const today = new Date().toISOString().slice(0, 10);
   const [fDate, setFDate] = useState(today);
-  const [fPaidTo, setFPaidTo] = useState("");
   const [fAmount, setFAmount] = useState("");
   const [fCat, setFCat] = useState(BASE_CATS[0]);
   const [fNotes, setFNotes] = useState("");
@@ -184,21 +183,21 @@ function MSiteTracker() {
       }
       cat = newCatName.trim();
     }
-    if (!fDate || !fPaidTo.trim() || isNaN(amt) || amt <= 0) {
-      setError("Enter a date, who you paid, and an amount above zero.");
+    if (!fDate || isNaN(amt) || amt <= 0 || !fNotes.trim()) {
+      setError("Enter a date, an amount above zero, and a note describing the expense.");
       return;
     }
     setError("");
     const entry = {
       id: "e-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
       date: fDate,
-      paidTo: fPaidTo.trim(),
+      paidTo: "", // legacy field — older imported entries still carry it
       amount: amt,
       category: cat,
       notes: fNotes.trim(),
     };
     persist([...expenses, entry]);
-    setFPaidTo(""); setFAmount(""); setFNotes(""); setFDate(today);
+    setFAmount(""); setFNotes(""); setFDate(today);
     setNewCatMode(false); setNewCatName("");
     showToast("Expense added — " + inr(amt));
     setTab("expenses");
@@ -438,12 +437,6 @@ function MSiteTracker() {
               </div>
             </div>
 
-            <div style={S.formLabel}>Paid to</div>
-            <input
-              value={fPaidTo} onChange={(e) => setFPaidTo(e.target.value)}
-              placeholder="e.g. Paid to Mestri, Cement (10 bags)" style={S.input}
-            />
-
             <div style={S.formLabel}>Category</div>
             <div style={S.chipWrap}>
               {allCats.map((c) => (
@@ -469,10 +462,10 @@ function MSiteTracker() {
               />
             )}
 
-            <div style={S.formLabel}>Notes (optional)</div>
+            <div style={S.formLabel}>Notes</div>
             <input
               value={fNotes} onChange={(e) => setFNotes(e.target.value)}
-              placeholder="e.g. Via PhonePe, 2nd payment" style={S.input}
+              placeholder="e.g. Paid to Mestri via PhonePe, 2nd payment" style={S.input}
             />
 
             <button style={S.primaryBtn} onClick={addExpense}>Save expense</button>
@@ -511,9 +504,9 @@ function MSiteTracker() {
             {filtered.map((e) => (
               <div key={e.id} style={S.row}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={S.rowTitle}>{e.paidTo}</div>
+                  <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
                   <div style={S.rowMeta}>{fmtDate(e.date)} · {e.category}</div>
-                  {e.notes && <div style={S.rowNotes}>{e.notes}</div>}
+                  {e.paidTo && e.notes && <div style={S.rowNotes}>{e.notes}</div>}
                 </div>
                 <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
                   <div style={S.rowAmt}>{inr(e.amount)}</div>
