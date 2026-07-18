@@ -34,7 +34,7 @@ const monthLabel = (ym) => {
 
 const fmtDate = (iso) => {
   const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 };
 
 const fmtDateTime = (iso) => {
@@ -208,6 +208,30 @@ function MSiteTracker() {
     }
   }, []);
 
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (e.state && typeof e.state.category === "string") {
+        setSelectedCategory(e.state.category);
+      } else {
+        setSelectedCategory(null);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const selectCategory = (catName) => {
+    setSelectedCategory(catName);
+    window.history.pushState({ category: catName }, "");
+  };
+
+  const closeCategory = () => {
+    setSelectedCategory(null);
+    if (window.history.state && window.history.state.category) {
+      window.history.back();
+    }
+  };
+
   const persist = (next) => {
     adoptExpenses(next);
     if (isDriveConnected()) {
@@ -373,7 +397,12 @@ function MSiteTracker() {
             ].map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => { setTab(key); setSelectedCategory(null); }}
+                onClick={() => {
+                  setTab(key);
+                  if (selectedCategory) {
+                    closeCategory();
+                  }
+                }}
                 style={{ ...S.tab, ...(tab === key ? S.tabActive : {}) }}
               >
                 {label}
@@ -391,299 +420,303 @@ function MSiteTracker() {
           </div>
         )}
 
-        {/* ---------- DASHBOARD ---------- */}
-        {tab === "dashboard" && (
-          <div>
-            {selectedCategory ? (
-              <div style={{ marginTop: 18 }}>
-                <button
-                  onClick={() => setSelectedCategory(null)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    fontSize: 12,
-                    color: GREY,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: 16,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = INK; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = GREY; }}
-                >
-                  ← BACK TO DASHBOARD
-                </button>
+        {selectedCategory ? (
+          <div style={{ marginTop: 18 }}>
+            <button
+              onClick={closeCategory}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 12,
+                color: GREY,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 16,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = INK; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = GREY; }}
+            >
+              ← BACK TO DASHBOARD
+            </button>
 
-                <div style={{ ...S.card, marginBottom: 18, borderLeft: "4px solid " + YELLOW }}>
-                  <div style={S.eyebrow}>CATEGORY DETAILED REPORT</div>
-                  <div style={{ ...S.totalRow, marginTop: 4 }}>
-                    <span style={{ fontSize: 24, fontWeight: 700 }}>{selectedCategory}</span>
-                    <span style={{ ...S.totalAmount, fontSize: 24, marginLeft: "auto" }}>{inr(catTotal)}</span>
-                  </div>
-                  <div style={{ fontSize: 12.5, color: GREY, marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
-                    {catExpenses.length} entries matching this category
-                  </div>
-                </div>
-
-                <div style={S.sectionLabel}>TRANSACTIONS IN "{selectedCategory.toUpperCase()}"</div>
-                {catExpenses.length === 0 ? (
-                  <div style={{ ...S.card, color: GREY, fontSize: 14 }}>
-                    No expenses found under this category.
-                  </div>
-                ) : (
-                  catExpenses.map((e) => (
-                    <div key={e.id} style={S.row}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
-                        <div style={S.rowMeta}>{fmtDate(e.date)}</div>
-                        {e.paidTo && e.notes && <div style={S.rowNotes}>{e.notes}</div>}
-                      </div>
-                      <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
-                        <div style={S.rowAmt}>{inr(e.amount)}</div>
-                        {confirmId === e.id ? (
-                          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                            <button style={S.dangerBtn} onClick={() => deleteExpense(e.id)}>Delete</button>
-                            <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>✕</button>
-                          </div>
-                        ) : (
-                          <button style={S.deleteLink} onClick={() => setConfirmId(e.id)}>Delete</button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
+            <div style={{ ...S.card, marginBottom: 18, borderLeft: "4px solid " + YELLOW }}>
+              <div style={S.eyebrow}>CATEGORY DETAILED REPORT</div>
+              <div style={{ ...S.totalRow, marginTop: 4 }}>
+                <span style={{ fontSize: 24, fontWeight: 700 }}>{selectedCategory}</span>
+                <span style={{ ...S.totalAmount, fontSize: 24, marginLeft: "auto" }}>{inr(catTotal)}</span>
               </div>
-            ) : empty ? (
-              <div style={{ ...S.card, textAlign: "center", padding: "36px 20px", marginTop: 18 }}>
-                <div style={{ fontSize: 34, marginBottom: 10 }}>🏗️</div>
-                <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>No expenses yet</div>
-                <div style={{ color: GREY, fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>
-                  Add your first expense to get started.
-                </div>
-                <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-                  <button style={{ ...S.primaryBtn, width: "auto", marginTop: 0, padding: "12px 20px" }} onClick={() => setTab("add")}>
-                    Add expense
-                  </button>
-                </div>
+              <div style={{ fontSize: 12.5, color: GREY, marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
+                {catExpenses.length} entries matching this category
+              </div>
+            </div>
+
+            <div style={S.sectionLabel}>TRANSACTIONS IN "{selectedCategory.toUpperCase()}"</div>
+            {catExpenses.length === 0 ? (
+              <div style={{ ...S.card, color: GREY, fontSize: 14 }}>
+                No expenses found under this category.
               </div>
             ) : (
-              <>
-                <div style={S.sectionLabel}>SPEND BY CATEGORY (TAP TO VIEW DETAILS)</div>
-                <div style={{ ...S.card, padding: "10px 14px" }}>
-                  {byCategory.map((c, i) => (
-                    <div
-                      key={c.name}
-                      onClick={() => setSelectedCategory(c.name)}
-                      onMouseEnter={() => setHoveredCat(c.name)}
-                      onMouseLeave={() => setHoveredCat(null)}
-                      style={{
-                        cursor: "pointer",
-                        background: hoveredCat === c.name ? "#FBFAF7" : "transparent",
-                        border: "1px solid " + (hoveredCat === c.name ? "#D8D5CD" : "transparent"),
-                        borderRadius: 6,
-                        padding: "10px",
-                        margin: i === byCategory.length - 1 ? "0 0 2px" : "0 0 10px",
-                        transition: "all 0.15s ease-in-out",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ ...S.catName, textDecoration: hoveredCat === c.name ? "underline" : "none", color: hoveredCat === c.name ? INK : "inherit" }}>
-                          {c.name} →
-                        </span>
-                        <span style={S.catAmt}>{inr(c.value)}</span>
+              catExpenses.map((e) => (
+                <div key={e.id} style={S.row}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
+                    <div style={S.rowMeta}>{fmtDate(e.date)}</div>
+                    {e.paidTo && e.notes && <div style={S.rowNotes}>{e.notes}</div>}
+                  </div>
+                  <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
+                    <div style={S.rowAmt}>{inr(e.amount)}</div>
+                    {confirmId === e.id ? (
+                      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                        <button style={S.dangerBtn} onClick={() => deleteExpense(e.id)}>Delete</button>
+                        <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>✕</button>
                       </div>
-                      <div style={S.barTrack}>
-                        <div
-                          style={{
-                            ...S.barFill,
-                            width: (c.value / byCategory[0].value) * 100 + "%",
-                            background: i === 0 ? YELLOW : INK,
-                          }}
-                        />
-                      </div>
+                    ) : (
+                      <button style={S.deleteLink} onClick={() => setConfirmId(e.id)}>Delete</button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <>
+            {/* ---------- DASHBOARD ---------- */}
+            {tab === "dashboard" && (
+              <div>
+                {empty ? (
+                  <div style={{ ...S.card, textAlign: "center", padding: "36px 20px", marginTop: 18 }}>
+                    <div style={{ fontSize: 34, marginBottom: 10 }}>🏗️</div>
+                    <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>No expenses yet</div>
+                    <div style={{ color: GREY, fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>
+                      Add your first expense to get started.
                     </div>
+                    <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                      <button style={{ ...S.primaryBtn, width: "auto", marginTop: 0, padding: "12px 20px" }} onClick={() => setTab("add")}>
+                        Add expense
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={S.sectionLabel}>SPEND BY CATEGORY (TAP TO VIEW DETAILS)</div>
+                    <div style={{ ...S.card, padding: "10px 14px" }}>
+                      {byCategory.map((c, i) => (
+                        <div
+                          key={c.name}
+                          onClick={() => selectCategory(c.name)}
+                          onMouseEnter={() => setHoveredCat(c.name)}
+                          onMouseLeave={() => setHoveredCat(null)}
+                          style={{
+                            cursor: "pointer",
+                            background: hoveredCat === c.name ? "#FBFAF7" : "transparent",
+                            border: "1px solid " + (hoveredCat === c.name ? "#D8D5CD" : "transparent"),
+                            borderRadius: 6,
+                            padding: "10px",
+                            margin: i === byCategory.length - 1 ? "0 0 2px" : "0 0 10px",
+                            transition: "all 0.15s ease-in-out",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ ...S.catName, textDecoration: hoveredCat === c.name ? "underline" : "none", color: hoveredCat === c.name ? INK : "inherit" }}>
+                              {c.name} →
+                            </span>
+                            <span style={S.catAmt}>{inr(c.value)}</span>
+                          </div>
+                          <div style={S.barTrack}>
+                            <div
+                              style={{
+                                ...S.barFill,
+                                width: (c.value / byCategory[0].value) * 100 + "%",
+                                background: i === 0 ? YELLOW : INK,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={S.sectionLabel}>SPEND BY MONTH</div>
+                    <div style={{ ...S.card, paddingBottom: 8 }}>
+                      <ResponsiveContainer width="100%" height={210}>
+                        <BarChart data={byMonth} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fill: GREY }}
+                            axisLine={{ stroke: "#D8D5CD" }}
+                            tickLine={false}
+                            interval={0}
+                            angle={-40}
+                            height={40}
+                            textAnchor="end"
+                          />
+                          <YAxis hide />
+                          <Tooltip
+                            formatter={(v) => [inr(v), "Spent"]}
+                            contentStyle={{
+                              fontFamily: "'IBM Plex Mono', monospace",
+                              fontSize: 12,
+                              border: "1px solid " + INK,
+                              borderRadius: 0,
+                              background: "#FFF",
+                            }}
+                          />
+                          <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                            {byMonth.map((_, i) => (
+                              <Cell key={i} fill={INK} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
+                )}
+
+                <div style={S.sectionLabel}>GOOGLE DRIVE BACKUP</div>
+                <div style={S.card}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ ...S.statusDot, background: driveConnected ? "#1E8E3E" : "#B3261E" }} />
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>
+                      {driveConnected ? "Connected" : "Disconnected"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: GREY, lineHeight: 1.5, marginTop: 6 }}>
+                    {driveConnected
+                      ? (lastBackup
+                          ? "Your data was last backed up on " + fmtDateTime(lastBackup) + "."
+                          : "Your data will be backed up on your next change.")
+                      : "Connect once and every future change is backed up automatically."}
+                  </div>
+                  {driveMessage && (
+                    <div style={{ fontSize: 12.5, color: "#B3261E", lineHeight: 1.5, marginTop: 6 }}>
+                      {driveMessage}
+                    </div>
+                  )}
+                  <div style={{ marginTop: 14 }}>
+                    {driveConnected ? (
+                      <button style={S.ghostBtn} onClick={handleDisconnectDrive}>Disconnect</button>
+                    ) : (
+                      <button
+                        style={{ ...S.primaryBtn, width: "auto", marginTop: 0, padding: "9px 16px", fontSize: 13 }}
+                        onClick={handleConnectDrive}
+                        disabled={driveBusy}
+                      >
+                        {driveBusy ? "Connecting…" : "Connect Google Drive"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ---------- ADD ---------- */}
+            {tab === "add" && (
+              <div style={{ ...S.card, marginTop: 18 }}>
+                <div className="formGrid">
+                  <div>
+                    <div style={S.formLabel}>Date</div>
+                    <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} style={S.input} />
+                  </div>
+                  <div>
+                    <div style={S.formLabel}>Amount (₹)</div>
+                    <input
+                      type="number" inputMode="decimal" value={fAmount}
+                      onChange={(e) => setFAmount(e.target.value)} placeholder="0" style={S.input}
+                    />
+                  </div>
+                </div>
+
+                <div style={S.formLabel}>Category</div>
+                <div style={S.chipWrap}>
+                  {allCats.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => { setFCat(c); setNewCatMode(false); }}
+                      style={{ ...S.chip, ...(!newCatMode && fCat === c ? S.chipActive : {}) }}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setNewCatMode(true)}
+                    style={{ ...S.chip, ...(newCatMode ? S.chipActive : {}), borderStyle: "dashed" }}
+                  >
+                    + New category
+                  </button>
+                </div>
+                {newCatMode && (
+                  <input
+                    value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="New category name, e.g. Painting" style={{ ...S.input, marginTop: 8 }}
+                  />
+                )}
+
+                <div style={S.formLabel}>Notes</div>
+                <input
+                  value={fNotes} onChange={(e) => setFNotes(e.target.value)}
+                  placeholder="e.g. Paid to Mestri via PhonePe, 2nd payment" style={S.input}
+                />
+
+                <button style={S.primaryBtn} onClick={addExpense}>Save expense</button>
+              </div>
+            )}
+
+            {/* ---------- EXPENSES ---------- */}
+            {tab === "expenses" && (
+              <div style={{ marginTop: 18 }}>
+                <input
+                  value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name, notes, or category"
+                  style={{ ...S.input, marginBottom: 10 }}
+                />
+                <div style={{ ...S.chipWrap, marginBottom: 12 }}>
+                  {["All", ...allCats].map((c) => (
+                    <button
+                      key={c} onClick={() => setFilterCat(c)}
+                      style={{ ...S.chip, ...(filterCat === c ? S.chipActive : {}) }}
+                    >
+                      {c}
+                    </button>
                   ))}
                 </div>
 
-                <div style={S.sectionLabel}>SPEND BY MONTH</div>
-                <div style={{ ...S.card, paddingBottom: 8 }}>
-                  <ResponsiveContainer width="100%" height={210}>
-                    <BarChart data={byMonth} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fill: GREY }}
-                        axisLine={{ stroke: "#D8D5CD" }}
-                        tickLine={false}
-                        interval={0}
-                        angle={-40}
-                        height={40}
-                        textAnchor="end"
-                      />
-                      <YAxis hide />
-                      <Tooltip
-                        formatter={(v) => [inr(v), "Spent"]}
-                        contentStyle={{
-                          fontFamily: "'IBM Plex Mono', monospace",
-                          fontSize: 12,
-                          border: "1px solid " + INK,
-                          borderRadius: 0,
-                          background: "#FFF",
-                        }}
-                      />
-                      <Bar dataKey="value" radius={[2, 2, 0, 0]}>
-                        {byMonth.map((_, i) => (
-                          <Cell key={i} fill={INK} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </>
-            )}
+                <div style={S.listSummary}>{filtered.length} entries · {inr(filteredTotal)}</div>
 
-            <div style={S.sectionLabel}>GOOGLE DRIVE BACKUP</div>
-            <div style={S.card}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ ...S.statusDot, background: driveConnected ? "#1E8E3E" : "#B3261E" }} />
-                <span style={{ fontWeight: 700, fontSize: 15 }}>
-                  {driveConnected ? "Connected" : "Disconnected"}
-                </span>
-              </div>
-              <div style={{ fontSize: 12.5, color: GREY, lineHeight: 1.5, marginTop: 6 }}>
-                {driveConnected
-                  ? (lastBackup
-                      ? "Your data was last backed up on " + fmtDateTime(lastBackup) + "."
-                      : "Your data will be backed up on your next change.")
-                  : "Connect once and every future change is backed up automatically."}
-              </div>
-              {driveMessage && (
-                <div style={{ fontSize: 12.5, color: "#B3261E", lineHeight: 1.5, marginTop: 6 }}>
-                  {driveMessage}
-                </div>
-              )}
-              <div style={{ marginTop: 14 }}>
-                {driveConnected ? (
-                  <button style={S.ghostBtn} onClick={handleDisconnectDrive}>Disconnect</button>
-                ) : (
-                  <button
-                    style={{ ...S.primaryBtn, width: "auto", marginTop: 0, padding: "9px 16px", fontSize: 13 }}
-                    onClick={handleConnectDrive}
-                    disabled={driveBusy}
-                  >
-                    {driveBusy ? "Connecting…" : "Connect Google Drive"}
-                  </button>
+                {filtered.length === 0 && (
+                  <div style={{ ...S.card, color: GREY, fontSize: 14 }}>
+                    {empty
+                      ? "No expenses yet. Add one from the Add Expense tab."
+                      : "No expenses match. Clear the search or pick another category."}
+                  </div>
                 )}
-              </div>
-            </div>
 
-          </div>
-        )}
-
-        {/* ---------- ADD ---------- */}
-        {tab === "add" && (
-          <div style={{ ...S.card, marginTop: 18 }}>
-            <div className="formGrid">
-              <div>
-                <div style={S.formLabel}>Date</div>
-                <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} style={S.input} />
-              </div>
-              <div>
-                <div style={S.formLabel}>Amount (₹)</div>
-                <input
-                  type="number" inputMode="decimal" value={fAmount}
-                  onChange={(e) => setFAmount(e.target.value)} placeholder="0" style={S.input}
-                />
-              </div>
-            </div>
-
-            <div style={S.formLabel}>Category</div>
-            <div style={S.chipWrap}>
-              {allCats.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => { setFCat(c); setNewCatMode(false); }}
-                  style={{ ...S.chip, ...(!newCatMode && fCat === c ? S.chipActive : {}) }}
-                >
-                  {c}
-                </button>
-              ))}
-              <button
-                onClick={() => setNewCatMode(true)}
-                style={{ ...S.chip, ...(newCatMode ? S.chipActive : {}), borderStyle: "dashed" }}
-              >
-                + New category
-              </button>
-            </div>
-            {newCatMode && (
-              <input
-                value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
-                placeholder="New category name, e.g. Painting" style={{ ...S.input, marginTop: 8 }}
-              />
-            )}
-
-            <div style={S.formLabel}>Notes</div>
-            <input
-              value={fNotes} onChange={(e) => setFNotes(e.target.value)}
-              placeholder="e.g. Paid to Mestri via PhonePe, 2nd payment" style={S.input}
-            />
-
-            <button style={S.primaryBtn} onClick={addExpense}>Save expense</button>
-          </div>
-        )}
-
-        {/* ---------- EXPENSES ---------- */}
-        {tab === "expenses" && (
-          <div style={{ marginTop: 18 }}>
-            <input
-              value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, notes, or category"
-              style={{ ...S.input, marginBottom: 10 }}
-            />
-            <div style={{ ...S.chipWrap, marginBottom: 12 }}>
-              {["All", ...allCats].map((c) => (
-                <button
-                  key={c} onClick={() => setFilterCat(c)}
-                  style={{ ...S.chip, ...(filterCat === c ? S.chipActive : {}) }}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
-            <div style={S.listSummary}>{filtered.length} entries · {inr(filteredTotal)}</div>
-
-            {filtered.length === 0 && (
-              <div style={{ ...S.card, color: GREY, fontSize: 14 }}>
-                {empty
-                  ? "No expenses yet. Add one from the Add Expense tab."
-                  : "No expenses match. Clear the search or pick another category."}
-              </div>
-            )}
-
-            {filtered.map((e) => (
-              <div key={e.id} style={S.row}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
-                  <div style={S.rowMeta}>{fmtDate(e.date)} · {e.category}</div>
-                  {e.paidTo && e.notes && <div style={S.rowNotes}>{e.notes}</div>}
-                </div>
-                <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
-                  <div style={S.rowAmt}>{inr(e.amount)}</div>
-                  {confirmId === e.id ? (
-                    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                      <button style={S.dangerBtn} onClick={() => deleteExpense(e.id)}>Delete</button>
-                      <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>✕</button>
+                {filtered.map((e) => (
+                  <div key={e.id} style={S.row}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
+                      <div style={S.rowMeta}>{fmtDate(e.date)} · {e.category}</div>
+                      {e.paidTo && e.notes && <div style={S.rowNotes}>{e.notes}</div>}
                     </div>
-                  ) : (
-                    <button style={S.deleteLink} onClick={() => setConfirmId(e.id)}>Delete</button>
-                  )}
-                </div>
+                    <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
+                      <div style={S.rowAmt}>{inr(e.amount)}</div>
+                      {confirmId === e.id ? (
+                        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                          <button style={S.dangerBtn} onClick={() => deleteExpense(e.id)}>Delete</button>
+                          <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>✕</button>
+                        </div>
+                      ) : (
+                        <button style={S.deleteLink} onClick={() => setConfirmId(e.id)}>Delete</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
