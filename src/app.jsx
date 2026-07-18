@@ -172,6 +172,44 @@ function MSiteTracker() {
     }
   }, [isDarkMode]);
 
+  // Touch Swipe Gesture State
+  const [touchStartX, setTouchStartX] = useState(null);
+  const [touchStartY, setTouchStartY] = useState(null);
+  const [slideAnim, setSlideAnim] = useState("");
+
+  const handleTouchStart = (e) => {
+    if (e.touches && e.touches.length === 1) {
+      setTouchStartX(e.touches[0].clientX);
+      setTouchStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX === null || touchStartY === null || editingExpense || selectedCategory) return;
+    if (e.changedTouches && e.changedTouches.length === 1) {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+
+      if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+        const tabsOrder = ["dashboard", "add", "expenses"];
+        const currentIndex = tabsOrder.indexOf(tab);
+
+        if (deltaX < 0 && currentIndex < tabsOrder.length - 1) {
+          setSlideAnim("slide-left");
+          setTab(tabsOrder[currentIndex + 1]);
+        } else if (deltaX > 0 && currentIndex > 0) {
+          setSlideAnim("slide-right");
+          setTab(tabsOrder[currentIndex - 1]);
+        }
+      }
+    }
+    setTouchStartX(null);
+    setTouchStartY(null);
+  };
+
+
   const today = new Date().toISOString().slice(0, 10);
   const [fDate, setFDate] = useState(today);
   const [fAmount, setFAmount] = useState("");
@@ -501,9 +539,10 @@ function MSiteTracker() {
       <div className="device-viewport">
         <style>{FONTS}</style>
         <div className="device-frame">
-          <div className="device-screen" style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: "var(--color-text-grey)", letterSpacing: "0.08em" }}>
-              LOADING SITE LEDGER…
+          <div className="device-screen" style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <div className="brand-spinner" />
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)", letterSpacing: "0.1em" }}>
+              SYNCING SITE LEDGER…
             </div>
           </div>
         </div>
@@ -523,7 +562,13 @@ function MSiteTracker() {
       </div>
 
       <div className="device-frame">
-        <div className="device-screen" style={{ ...S.page, ...(editingExpense ? { overflowY: "hidden" } : {}) }}>
+        <div
+          className="device-screen"
+          style={{ ...S.page, ...(editingExpense ? { overflowY: "hidden" } : {}) }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+
 
       <div style={selectedCategory ? { position: "sticky", top: 0, zIndex: 10 } : S.header}>
         <div style={S.hazard} aria-hidden="true" />
@@ -1154,6 +1199,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   --color-input-border: #C9C5BB;
   --color-notes: #5C574C;
   --color-tab-border: #EDEBE5;
+  --color-hazard-stripe: ${INK};
 }
 
 :root.dark-theme {
@@ -1167,8 +1213,39 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   --color-input-border: #3F3C34;
   --color-notes: #A7A297;
   --color-tab-border: #272520;
+  --color-hazard-stripe: #181714;
 }
 
+.brand-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--color-input-border);
+  border-top-color: ${YELLOW};
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.slide-left {
+  animation: slideInRight 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.slide-right {
+  animation: slideInLeft 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0.85; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0.85; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 
 .expense-row {
   cursor: pointer;
@@ -1250,7 +1327,8 @@ const S = {
   header: { background: "var(--color-bg-card)", borderBottom: "1px solid var(--color-border)", position: "sticky", top: 0, zIndex: 10 },
   headInner: { maxWidth: "100%", margin: "0 auto" },
   content: { padding: "0 16px 28px", maxWidth: "100%", margin: "0 auto" },
-  hazard: { height: 8, background: `repeating-linear-gradient(45deg, ${YELLOW} 0 12px, var(--color-text) 12px 24px)` },
+  hazard: { height: 8, background: `repeating-linear-gradient(45deg, ${YELLOW} 0 12px, var(--color-hazard-stripe) 12px 24px)` },
+
   eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: "var(--color-text-grey)", marginBottom: 6 },
   totalRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
   totalAmount: { fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 30, letterSpacing: "-0.01em" },
