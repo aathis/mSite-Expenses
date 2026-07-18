@@ -1,0 +1,602 @@
+import { useState, useEffect, useMemo } from "react";
+import { createRoot } from "react-dom/client";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import {
+  isDriveConnected,
+  connectDrive,
+  disconnectDrive,
+  backupExpensesToDrive,
+  getLastBackupTime,
+} from "./drive.js";
+
+const STORAGE_KEY = "msite-construction-expenses-v1";
+const INK = "#1D1B16";
+const CONCRETE = "#EAE8E3";
+const YELLOW = "#F5B700";
+const GREY = "#8B8578";
+
+const BASE_CATS = [
+  "Mestri (Velu)", "Electrical & Plumbing", "JCB & Tractor", "Paya & Digging",
+  "Iron bars", "Cement", "Hollow blocks", "Water tanker", "Wood work",
+  "Sand & Jelly", "Misc & Tips",
+];
+
+const inr = (n) =>
+  "₹" + new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n);
+
+const monthLabel = (ym) => {
+  const [y, m] = ym.split("-");
+  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return names[parseInt(m, 10) - 1] + " '" + y.slice(2);
+};
+
+const fmtDate = (iso) => {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+};
+
+const fmtDateTime = (iso) => {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+  });
+};
+
+function loadStored() {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY);
+    return v ? JSON.parse(v) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function MSiteTracker() {
+  const [expenses, setExpenses] = useState(null);
+  const [tab, setTab] = useState("dashboard");
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterCat, setFilterCat] = useState("All");
+  const [confirmId, setConfirmId] = useState(null);
+  const [driveConnected, setDriveConnected] = useState(isDriveConnected());
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [driveMessage, setDriveMessage] = useState("");
+  const [lastBackup, setLastBackup] = useState(getLastBackupTime());
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [fDate, setFDate] = useState(today);
+  const [fPaidTo, setFPaidTo] = useState("");
+  const [fAmount, setFAmount] = useState("");
+  const [fCat, setFCat] = useState(BASE_CATS[0]);
+  const [fNotes, setFNotes] = useState("");
+  const [newCatMode, setNewCatMode] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+
+  useEffect(() => {
+    setExpenses(loadStored());
+  }, []);
+
+  const persist = (next) => {
+    setExpenses(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (e) {
+      setError("Could not save data in this browser. Changes may not persist.");
+    }
+    if (isDriveConnected()) {
+      backupExpensesToDrive(next).then((res) => {
+        if (res.ok) {
+          setLastBackup(res.at);
+          setDriveMessage("");
+        } else if (!res.skipped) {
+          setDriveMessage(res.error || "Backup to Drive failed. Reconnect below.");
+        }
+      });
+    }
+  };
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2800);
+  };
+
+  const handleConnectDrive = () => {
+    setDriveBusy(true);
+    setDriveMessage("");
+    connectDrive()
+      .then(() => {
+        setDriveConnected(true);
+        setDriveBusy(false);
+        showToast("Google Drive connected");
+        return backupExpensesToDrive(expenses);
+      })
+      .then((res) => {
+        if (res && res.ok) setLastBackup(res.at);
+      })
+      .catch((e) => {
+        setDriveBusy(false);
+        setDriveMessage(e.message || "Could not connect to Google Drive.");
+      });
+  };
+
+  const handleDisconnectDrive = () => {
+    disconnectDrive();
+    setDriveConnected(false);
+    setLastBackup(null);
+    setDriveMessage("");
+    showToast("Google Drive disconnected");
+  };
+
+  const addExpense = () => {
+    const amt = parseFloat(fAmount);
+    let cat = fCat;
+    if (newCatMode) {
+      if (!newCatName.trim()) {
+        setError("Type a name for the new category, or pick an existing one.");
+        return;
+      }
+      cat = newCatName.trim();
+    }
+    if (!fDate || !fPaidTo.trim() || isNaN(amt) || amt <= 0) {
+      setError("Enter a date, who you paid, and an amount above zero.");
+      return;
+    }
+    setError("");
+    const entry = {
+      id: "e-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+      date: fDate,
+      paidTo: fPaidTo.trim(),
+      amount: amt,
+      category: cat,
+      notes: fNotes.trim(),
+    };
+    persist([...expenses, entry]);
+    setFPaidTo(""); setFAmount(""); setFNotes(""); setFDate(today);
+    setNewCatMode(false); setNewCatName("");
+    showToast("Expense added — " + inr(amt));
+    setTab("expenses");
+  };
+
+  const deleteExpense = (id) => {
+    persist(expenses.filter((e) => e.id !== id));
+    setConfirmId(null);
+    showToast("Expense deleted");
+  };
+
+  const clearAll = () => {
+    persist([]);
+    setConfirmId(null);
+    showToast("All data cleared");
+  };
+
+  const total = useMemo(
+    () => (expenses || []).reduce((s, e) => s + e.amount, 0),
+    [expenses]
+  );
+
+  const byCategory = useMemo(() => {
+    const m = {};
+    (expenses || []).forEach((e) => (m[e.category] = (m[e.category] || 0) + e.amount));
+    return Object.keys(m)
+      .map((c) => ({ name: c, value: m[c] }))
+      .sort((a, b) => b.value - a.value);
+  }, [expenses]);
+
+  const byMonth = useMemo(() => {
+    const m = {};
+    (expenses || []).forEach((e) => {
+      const ym = e.date.slice(0, 7);
+      m[ym] = (m[ym] || 0) + e.amount;
+    });
+    return Object.keys(m).sort().map((ym) => ({ name: monthLabel(ym), value: m[ym] }));
+  }, [expenses]);
+
+  const allCats = useMemo(() => {
+    const extra = [...new Set((expenses || []).map((e) => e.category))].filter(
+      (c) => !BASE_CATS.includes(c)
+    );
+    return [...BASE_CATS, ...extra];
+  }, [expenses]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (expenses || [])
+      .filter((e) => filterCat === "All" || e.category === filterCat)
+      .filter(
+        (e) =>
+          !q ||
+          e.paidTo.toLowerCase().includes(q) ||
+          (e.notes || "").toLowerCase().includes(q) ||
+          e.category.toLowerCase().includes(q)
+      )
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [expenses, search, filterCat]);
+
+  const filteredTotal = filtered.reduce((s, e) => s + e.amount, 0);
+
+  if (!expenses) {
+    return (
+      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <style>{FONTS}</style>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: GREY, letterSpacing: "0.08em" }}>
+          LOADING SITE LEDGER…
+        </div>
+      </div>
+    );
+  }
+
+  const empty = expenses.length === 0;
+
+  return (
+    <div style={S.page}>
+      <style>{FONTS}</style>
+
+      <div style={S.header}>
+        <div style={S.hazard} aria-hidden="true" />
+        <div className="headInner" style={S.headInner}>
+          <div style={{ padding: "20px 20px 16px" }}>
+            <div style={S.eyebrow}>M-SITE · CONSTRUCTION LEDGER</div>
+            <div style={S.totalRow}>
+              <span style={S.totalAmount}>{inr(total)}</span>
+              <span style={S.totalMeta}>{expenses.length} entries</span>
+            </div>
+          </div>
+          <div style={S.tabs}>
+            {[
+              ["dashboard", "Dashboard"],
+              ["add", "Add expense"],
+              ["expenses", "Expenses"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                style={{ ...S.tab, ...(tab === key ? S.tabActive : {}) }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={S.content}>
+        {error && (
+          <div style={S.errorBox}>
+            <span>{error}</span>
+            <button style={S.errorClose} onClick={() => setError("")}>✕</button>
+          </div>
+        )}
+
+        {/* ---------- DASHBOARD ---------- */}
+        {tab === "dashboard" && (
+          <div>
+            {empty ? (
+              <div style={{ ...S.card, textAlign: "center", padding: "36px 20px", marginTop: 18 }}>
+                <div style={{ fontSize: 34, marginBottom: 10 }}>🏗️</div>
+                <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>No expenses yet</div>
+                <div style={{ color: GREY, fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>
+                  Add your first expense to get started.
+                </div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                  <button style={{ ...S.primaryBtn, width: "auto", marginTop: 0, padding: "12px 20px" }} onClick={() => setTab("add")}>
+                    Add expense
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={S.sectionLabel}>SPEND BY CATEGORY</div>
+                <div style={S.card}>
+                  {byCategory.map((c, i) => (
+                    <div key={c.name} style={{ marginBottom: i === byCategory.length - 1 ? 0 : 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={S.catName}>{c.name}</span>
+                        <span style={S.catAmt}>{inr(c.value)}</span>
+                      </div>
+                      <div style={S.barTrack}>
+                        <div
+                          style={{
+                            ...S.barFill,
+                            width: (c.value / byCategory[0].value) * 100 + "%",
+                            background: i === 0 ? YELLOW : INK,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={S.sectionLabel}>SPEND BY MONTH</div>
+                <div style={{ ...S.card, paddingBottom: 8 }}>
+                  <ResponsiveContainer width="100%" height={210}>
+                    <BarChart data={byMonth} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fill: GREY }}
+                        axisLine={{ stroke: "#D8D5CD" }}
+                        tickLine={false}
+                        interval={0}
+                        angle={-40}
+                        height={40}
+                        textAnchor="end"
+                      />
+                      <YAxis hide />
+                      <Tooltip
+                        formatter={(v) => [inr(v), "Spent"]}
+                        contentStyle={{
+                          fontFamily: "'IBM Plex Mono', monospace",
+                          fontSize: 12,
+                          border: "1px solid " + INK,
+                          borderRadius: 0,
+                          background: "#FFF",
+                        }}
+                      />
+                      <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                        {byMonth.map((_, i) => (
+                          <Cell key={i} fill={INK} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+
+            <div style={S.sectionLabel}>GOOGLE DRIVE BACKUP</div>
+            <div style={{ ...S.card, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {driveConnected ? (
+                <>
+                  <span style={{ fontSize: 13.5 }}>
+                    <strong>Connected.</strong>{" "}
+                    {lastBackup ? "Last backup: " + fmtDateTime(lastBackup) : "Will back up on your next change."}
+                  </span>
+                  <button style={{ ...S.ghostBtn, marginLeft: "auto" }} onClick={handleDisconnectDrive}>
+                    Disconnect
+                  </button>
+                </>
+              ) : (
+                <button
+                  style={{ ...S.primaryBtn, width: "auto", marginTop: 0, padding: "9px 16px", fontSize: 13 }}
+                  onClick={handleConnectDrive}
+                  disabled={driveBusy}
+                >
+                  {driveBusy ? "Connecting…" : "Connect Google Drive"}
+                </button>
+              )}
+              {driveMessage && (
+                <div style={{ flexBasis: "100%", fontSize: 12.5, color: "#B3261E", lineHeight: 1.5 }}>
+                  {driveMessage}
+                </div>
+              )}
+              <div style={{ flexBasis: "100%", fontSize: 12.5, color: GREY, lineHeight: 1.5 }}>
+                {driveConnected
+                  ? "Every expense you add or delete is backed up automatically to a hidden folder in your Drive that only this app can see."
+                  : "Connect once and every future change is backed up automatically — no need to remember to export anything."}
+              </div>
+            </div>
+
+            <div style={S.sectionLabel}>DATA</div>
+            <div style={{ ...S.card, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {!empty && (confirmId === "clear" ? (
+                <span style={{ display: "flex", gap: 8 }}>
+                  <button style={S.dangerBtn} onClick={clearAll}>Confirm clear</button>
+                  <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>Cancel</button>
+                </span>
+              ) : (
+                <button style={{ ...S.ghostBtn, color: "#B3261E", borderColor: "#B3261E" }} onClick={() => setConfirmId("clear")}>
+                  Clear all
+                </button>
+              ))}
+              <div style={{ flexBasis: "100%", fontSize: 12.5, color: GREY, lineHeight: 1.5 }}>
+                Data is saved in this browser on this device{driveConnected ? ", and mirrored to your Google Drive." : "."}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---------- ADD ---------- */}
+        {tab === "add" && (
+          <div style={{ ...S.card, marginTop: 18 }}>
+            <div className="formGrid">
+              <div>
+                <div style={S.formLabel}>Date</div>
+                <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} style={S.input} />
+              </div>
+              <div>
+                <div style={S.formLabel}>Amount (₹)</div>
+                <input
+                  type="number" inputMode="decimal" value={fAmount}
+                  onChange={(e) => setFAmount(e.target.value)} placeholder="0" style={S.input}
+                />
+              </div>
+            </div>
+
+            <div style={S.formLabel}>Paid to</div>
+            <input
+              value={fPaidTo} onChange={(e) => setFPaidTo(e.target.value)}
+              placeholder="e.g. Paid to Mestri, Cement (10 bags)" style={S.input}
+            />
+
+            <div style={S.formLabel}>Category</div>
+            <div style={S.chipWrap}>
+              {allCats.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => { setFCat(c); setNewCatMode(false); }}
+                  style={{ ...S.chip, ...(!newCatMode && fCat === c ? S.chipActive : {}) }}
+                >
+                  {c}
+                </button>
+              ))}
+              <button
+                onClick={() => setNewCatMode(true)}
+                style={{ ...S.chip, ...(newCatMode ? S.chipActive : {}), borderStyle: "dashed" }}
+              >
+                + New category
+              </button>
+            </div>
+            {newCatMode && (
+              <input
+                value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="New category name, e.g. Painting" style={{ ...S.input, marginTop: 8 }}
+              />
+            )}
+
+            <div style={S.formLabel}>Notes (optional)</div>
+            <input
+              value={fNotes} onChange={(e) => setFNotes(e.target.value)}
+              placeholder="e.g. Via PhonePe, 2nd payment" style={S.input}
+            />
+
+            <button style={S.primaryBtn} onClick={addExpense}>Save expense</button>
+          </div>
+        )}
+
+        {/* ---------- EXPENSES ---------- */}
+        {tab === "expenses" && (
+          <div style={{ marginTop: 18 }}>
+            <input
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, notes, or category"
+              style={{ ...S.input, marginBottom: 10 }}
+            />
+            <div style={{ ...S.chipWrap, marginBottom: 12 }}>
+              {["All", ...allCats].map((c) => (
+                <button
+                  key={c} onClick={() => setFilterCat(c)}
+                  style={{ ...S.chip, ...(filterCat === c ? S.chipActive : {}) }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            <div style={S.listSummary}>{filtered.length} entries · {inr(filteredTotal)}</div>
+
+            {filtered.length === 0 && (
+              <div style={{ ...S.card, color: GREY, fontSize: 14 }}>
+                {empty
+                  ? "No expenses yet. Add one from the Add Expense tab."
+                  : "No expenses match. Clear the search or pick another category."}
+              </div>
+            )}
+
+            {filtered.map((e) => (
+              <div key={e.id} style={S.row}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={S.rowTitle}>{e.paidTo}</div>
+                  <div style={S.rowMeta}>{fmtDate(e.date)} · {e.category}</div>
+                  {e.notes && <div style={S.rowNotes}>{e.notes}</div>}
+                </div>
+                <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
+                  <div style={S.rowAmt}>{inr(e.amount)}</div>
+                  {confirmId === e.id ? (
+                    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                      <button style={S.dangerBtn} onClick={() => deleteExpense(e.id)}>Delete</button>
+                      <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>✕</button>
+                    </div>
+                  ) : (
+                    <button style={S.deleteLink} onClick={() => setConfirmId(e.id)}>Delete</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {toast && <div style={S.toast}>{toast}</div>}
+    </div>
+  );
+}
+
+const FONTS = `
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+* { box-sizing: border-box; }
+input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 1px; }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .formGrid { grid-template-columns: 1fr; gap: 0; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+`;
+
+const S = {
+  page: { minHeight: "100vh", background: CONCRETE, color: INK, fontFamily: "'Space Grotesk', system-ui, sans-serif" },
+  header: { background: "#FFFFFF", borderBottom: "1px solid #D8D5CD", position: "sticky", top: 0, zIndex: 10 },
+  headInner: { maxWidth: 860, margin: "0 auto" },
+  content: { padding: "0 16px 80px", maxWidth: 860, margin: "0 auto" },
+  hazard: { height: 8, background: `repeating-linear-gradient(45deg, ${YELLOW} 0 12px, ${INK} 12px 24px)` },
+  eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: GREY, marginBottom: 6 },
+  totalRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
+  totalAmount: { fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 30, letterSpacing: "-0.01em" },
+  totalMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: GREY },
+  tabs: { display: "flex", borderTop: "1px solid #EDEBE5" },
+  tab: {
+    flex: 1, padding: "12px 4px", background: "none", border: "none",
+    borderBottom: "3px solid transparent", fontFamily: "'Space Grotesk', sans-serif",
+    fontWeight: 500, fontSize: 14, color: GREY, cursor: "pointer",
+  },
+  tabActive: { color: INK, borderBottom: "3px solid " + YELLOW, fontWeight: 700 },
+  sectionLabel: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: GREY, margin: "18px 2px 8px" },
+  card: { background: "#FFFFFF", border: "1px solid #D8D5CD", borderRadius: 6, padding: 16 },
+  catName: { fontSize: 13.5, fontWeight: 500 },
+  catAmt: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600 },
+  barTrack: { height: 6, background: "#EFEDE8", borderRadius: 3, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 3, transition: "width 0.4s ease" },
+  formLabel: {
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.12em",
+    color: GREY, textTransform: "uppercase", margin: "14px 0 6px",
+  },
+  input: {
+    width: "100%", padding: "11px 12px", fontSize: 15,
+    fontFamily: "'Space Grotesk', sans-serif", border: "1px solid #C9C5BB",
+    borderRadius: 5, background: "#FBFAF7", color: INK,
+  },
+  chipWrap: { display: "flex", flexWrap: "wrap", gap: 7 },
+  chip: {
+    padding: "7px 11px", fontSize: 12.5, fontFamily: "'Space Grotesk', sans-serif",
+    fontWeight: 500, border: "1px solid #C9C5BB", borderRadius: 999,
+    background: "#FBFAF7", color: INK, cursor: "pointer",
+  },
+  chipActive: { background: INK, color: YELLOW, border: "1px solid " + INK, fontWeight: 700 },
+  primaryBtn: {
+    width: "100%", marginTop: 20, padding: "13px", fontSize: 15, fontWeight: 700,
+    fontFamily: "'Space Grotesk', sans-serif", background: YELLOW, color: INK,
+    border: "1px solid " + INK, borderRadius: 6, cursor: "pointer",
+  },
+  ghostBtn: {
+    padding: "9px 14px", fontSize: 13, fontFamily: "'Space Grotesk', sans-serif",
+    background: "none", border: "1px solid #C9C5BB", borderRadius: 5, color: INK, cursor: "pointer",
+  },
+  dangerBtn: {
+    padding: "8px 14px", fontSize: 13, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
+    background: "#B3261E", color: "#FFF", border: "none", borderRadius: 5, cursor: "pointer",
+  },
+  deleteLink: {
+    marginTop: 4, padding: 0, background: "none", border: "none", fontSize: 12,
+    fontFamily: "'IBM Plex Mono', monospace", color: GREY, cursor: "pointer", textDecoration: "underline",
+  },
+  listSummary: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: GREY, margin: "0 2px 10px" },
+  row: {
+    display: "flex", alignItems: "flex-start", background: "#FFFFFF",
+    border: "1px solid #D8D5CD", borderRadius: 6, padding: "12px 14px", marginBottom: 8,
+  },
+  rowTitle: { fontSize: 14.5, fontWeight: 500, lineHeight: 1.35 },
+  rowMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: GREY, marginTop: 3 },
+  rowNotes: { fontSize: 12.5, color: "#5C574C", marginTop: 4, lineHeight: 1.4 },
+  errorBox: {
+    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+    background: "#FBEAE9", border: "1px solid #B3261E", color: "#7A1712",
+    borderRadius: 6, padding: "10px 12px", fontSize: 13.5, margin: "14px 0 0",
+  },
+  errorClose: { background: "none", border: "none", color: "#7A1712", cursor: "pointer", fontSize: 14, flexShrink: 0 },
+  toast: {
+    position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
+    background: INK, color: YELLOW, fontFamily: "'IBM Plex Mono', monospace",
+    fontSize: 13, padding: "10px 18px", borderRadius: 6, zIndex: 100,
+    boxShadow: "0 4px 14px rgba(0,0,0,0.25)", maxWidth: "92vw", textAlign: "center",
+  },
+};
+
+const root = createRoot(document.getElementById("root"));
+root.render(<MSiteTracker />);

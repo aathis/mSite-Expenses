@@ -1,0 +1,5 @@
+node_modules/
+dist/bundle.js
+# NEVER commit personal expense data
+data/
+*.local.js
