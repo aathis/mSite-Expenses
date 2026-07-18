@@ -293,15 +293,14 @@ function MSiteTracker() {
 
   const selectCategory = (catName) => {
     setSelectedCategory(catName);
-    window.history.pushState({ category: catName }, "");
+    window.history.replaceState({ category: catName }, "");
   };
 
   const closeCategory = () => {
     setSelectedCategory(null);
-    if (window.history.state && window.history.state.category) {
-      window.history.back();
-    }
+    window.history.replaceState(null, "");
   };
+
 
   const persist = (next) => {
     adoptExpenses(next);
@@ -974,13 +973,14 @@ function MSiteTracker() {
               />
             )}
  
-            <div style={S.formLabel}>Additional notes (optional)</div>
+            <div style={S.formLabel}>Notes</div>
             <input
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
               placeholder="e.g. Paid via PhonePe, Invoice #12"
               style={S.input}
             />
+
 
  
             <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
@@ -1268,7 +1268,7 @@ const S = {
     color: "var(--color-text-grey)", textTransform: "uppercase", margin: "14px 0 6px",
   },
   input: {
-    width: "100%", padding: "11px 12px", fontSize: 15,
+    width: "100%", boxSizing: "border-box", maxWidth: "100%", padding: "11px 12px", fontSize: 15,
     fontFamily: "'Space Grotesk', sans-serif", border: "1px solid var(--color-input-border)",
     borderRadius: 5, background: "var(--color-input-bg)", color: "var(--color-text)",
   },
@@ -1280,10 +1280,11 @@ const S = {
   },
   chipActive: { background: "var(--color-text)", color: YELLOW, border: "1px solid var(--color-text)", fontWeight: 700 },
   primaryBtn: {
-    width: "100%", marginTop: 20, padding: "13px", fontSize: 15, fontWeight: 700,
+    width: "100%", boxSizing: "border-box", marginTop: 20, padding: "13px", fontSize: 15, fontWeight: 700,
     fontFamily: "'Space Grotesk', sans-serif", background: YELLOW, color: INK,
-    border: "1px solid var(--color-text)", borderRadius: 6, cursor: "pointer",
+    border: "none", borderRadius: 6, cursor: "pointer",
   },
+
   ghostBtn: {
     padding: "9px 14px", fontSize: 13, fontFamily: "'Space Grotesk', sans-serif",
     background: "none", border: "1px solid var(--color-input-border)", borderRadius: 5, color: "var(--color-text)", cursor: "pointer",
