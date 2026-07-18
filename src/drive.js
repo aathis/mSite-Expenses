@@ -84,8 +84,10 @@ export function disconnectDrive() {
   accessToken = null;
   tokenExpiresAt = 0;
   localStorage.removeItem(CONNECTED_KEY);
-  localStorage.removeItem(FILE_ID_KEY);
   localStorage.removeItem(LAST_BACKUP_KEY);
+  // Deliberately keep FILE_ID_KEY: it points at the same Drive file across
+  // reconnects, so a future name-based re-search (which can't distinguish
+  // duplicates well) is never needed unless the file is actually gone.
 }
 
 async function ensureToken() {
@@ -109,11 +111,14 @@ async function findExistingFileId(token) {
   if (cached) return cached;
   const url =
     "https://www.googleapis.com/drive/v3/files" +
-    "?spaces=appDataFolder&fields=files(id,name)" +
+    "?spaces=appDataFolder&fields=files(id,name,modifiedTime,size)" +
+    "&orderBy=modifiedTime desc" +
     "&q=" + encodeURIComponent(`name='${DRIVE_BACKUP_FILENAME}'`);
   const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
   if (!res.ok) throw await googleApiError(res, "Could not check Google Drive for an existing backup.");
   const data = await res.json();
+  // If more than one file with this name exists (e.g. from an earlier bug
+  // creating duplicates), always prefer the most recently modified one.
   return data.files?.[0]?.id || null;
 }
 
