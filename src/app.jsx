@@ -379,37 +379,39 @@ function MSiteTracker() {
     <div style={S.page}>
       <style>{FONTS}</style>
 
-      <div style={S.header}>
+      <div style={selectedCategory ? { position: "sticky", top: 0, zIndex: 10 } : S.header}>
         <div style={S.hazard} aria-hidden="true" />
-        <div className="headInner" style={S.headInner}>
-          <div style={{ padding: "20px 20px 16px" }}>
-            <div style={S.eyebrow}>M-SITE · CONSTRUCTION LEDGER</div>
-            <div style={S.totalRow}>
-              <span style={S.totalAmount}>{inr(total)}</span>
-              <span style={S.totalMeta}>{expenses.length} entries</span>
+        {!selectedCategory && (
+          <div className="headInner" style={S.headInner}>
+            <div style={{ padding: "20px 20px 16px" }}>
+              <div style={S.eyebrow}>M-SITE · CONSTRUCTION LEDGER</div>
+              <div style={S.totalRow}>
+                <span style={S.totalAmount}>{inr(total)}</span>
+                <span style={S.totalMeta}>{expenses.length} entries</span>
+              </div>
+            </div>
+            <div style={S.tabs}>
+              {[
+                ["dashboard", "Dashboard"],
+                ["add", "Add expense"],
+                ["expenses", "Expenses"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setTab(key);
+                    if (selectedCategory) {
+                      closeCategory();
+                    }
+                  }}
+                  style={{ ...S.tab, ...(tab === key ? S.tabActive : {}) }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
-          <div style={S.tabs}>
-            {[
-              ["dashboard", "Dashboard"],
-              ["add", "Add expense"],
-              ["expenses", "Expenses"],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => {
-                  setTab(key);
-                  if (selectedCategory) {
-                    closeCategory();
-                  }
-                }}
-                style={{ ...S.tab, ...(tab === key ? S.tabActive : {}) }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       <div style={S.content}>
