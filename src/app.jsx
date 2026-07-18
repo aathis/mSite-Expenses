@@ -740,7 +740,8 @@ function MSiteTracker() {
         )}
         {!selectedCategory && (
           <div style={S.footer}>
-            total {expenses.length} {expenses.length === 1 ? "entry" : "entries"}{lastModified ? ` · last updated ${fmtDateTime(lastModified)}` : ""}
+            <div>Total entries: {expenses.length}</div>
+            {lastModified && <div style={{ marginTop: 4 }}>Last updated time: {fmtDateTime(lastModified)}</div>}
           </div>
         )}
       </div>
