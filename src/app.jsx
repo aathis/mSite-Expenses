@@ -270,6 +270,17 @@ function MSiteTracker() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  useEffect(() => {
+    if (editingExpense) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [editingExpense]);
+
   const selectCategory = (catName) => {
     setSelectedCategory(catName);
     window.history.pushState({ category: catName }, "");
@@ -495,7 +506,7 @@ function MSiteTracker() {
       </div>
 
       <div className="device-frame">
-        <div className="device-screen" style={S.page}>
+        <div className="device-screen" style={{ ...S.page, ...(editingExpense ? { overflowY: "hidden" } : {}) }}>
 
       <div style={selectedCategory ? { position: "sticky", top: 0, zIndex: 10 } : S.header}>
         <div style={S.hazard} aria-hidden="true" />
@@ -871,6 +882,7 @@ function MSiteTracker() {
           </div>
         )}
       </div>
+      </div>
 
       {editingExpense && (
         <div style={S.modalOverlay} className={`bottom-sheet-overlay ${isClosing ? "closing" : ""}`} onClick={closeBottomSheet}>
@@ -979,7 +991,6 @@ function MSiteTracker() {
       )}
 
       {toast && <div style={S.toast}>{toast}</div>}
-        </div>
       </div>
     </div>
   );
