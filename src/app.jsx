@@ -174,43 +174,6 @@ function MSiteTracker() {
     showToast("Google Drive disconnected");
   };
 
-  const handleBackupNow = () => {
-    if (!expenses || expenses.length === 0) {
-      setDriveMessage("Nothing to back up on this device. Use Restore from Drive to load your data first.");
-      return;
-    }
-    setDriveBusy(true);
-    setDriveMessage("");
-    backupExpensesToDrive(expenses).then((res) => {
-      setDriveBusy(false);
-      if (res.ok) {
-        setLastBackup(res.at);
-        showToast(expenses.length + " expense" + (expenses.length === 1 ? "" : "s") + " backed up to Google Drive");
-      } else {
-        setDriveMessage(res.error || "Backup to Drive failed.");
-      }
-    });
-  };
-
-  const handleRestoreFromDrive = () => {
-    setDriveBusy(true);
-    setDriveMessage("");
-    restoreFromDrive().then((res) => {
-      setDriveBusy(false);
-      if (res.ok) {
-        setExpenses(res.expenses);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(res.expenses));
-        } catch (e) {
-          setError("Could not save restored data in this browser.");
-        }
-        showToast(res.expenses.length + " expenses restored from Drive");
-      } else {
-        setDriveMessage(res.error || "Restore from Drive failed.");
-      }
-    });
-  };
-
   const addExpense = () => {
     const amt = parseFloat(fAmount);
     let cat = fCat;
@@ -245,12 +208,6 @@ function MSiteTracker() {
     persist(expenses.filter((e) => e.id !== id));
     setConfirmId(null);
     showToast("Expense deleted");
-  };
-
-  const clearAll = () => {
-    persist([]);
-    setConfirmId(null);
-    showToast("All data cleared");
   };
 
   const total = useMemo(
@@ -430,16 +387,10 @@ function MSiteTracker() {
             <div style={{ ...S.card, display: "flex", gap: 10, flexWrap: "wrap" }}>
               {driveConnected ? (
                 <>
-                  <span style={{ fontSize: 13.5, flexBasis: "100%" }}>
+                  <span style={{ fontSize: 13.5 }}>
                     <strong>Connected.</strong>{" "}
                     {lastBackup ? "Last backup: " + fmtDateTime(lastBackup) : "Will back up on your next change."}
                   </span>
-                  <button style={S.ghostBtn} onClick={handleBackupNow} disabled={driveBusy}>
-                    {driveBusy ? "Working…" : "Back up now"}
-                  </button>
-                  <button style={S.ghostBtn} onClick={handleRestoreFromDrive} disabled={driveBusy}>
-                    {driveBusy ? "Working…" : "Restore from Drive"}
-                  </button>
                   <button style={{ ...S.ghostBtn, marginLeft: "auto" }} onClick={handleDisconnectDrive}>
                     Disconnect
                   </button>
@@ -465,22 +416,6 @@ function MSiteTracker() {
               </div>
             </div>
 
-            <div style={S.sectionLabel}>DATA</div>
-            <div style={{ ...S.card, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {!empty && (confirmId === "clear" ? (
-                <span style={{ display: "flex", gap: 8 }}>
-                  <button style={S.dangerBtn} onClick={clearAll}>Confirm clear</button>
-                  <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>Cancel</button>
-                </span>
-              ) : (
-                <button style={{ ...S.ghostBtn, color: "#B3261E", borderColor: "#B3261E" }} onClick={() => setConfirmId("clear")}>
-                  Clear all
-                </button>
-              ))}
-              <div style={{ flexBasis: "100%", fontSize: 12.5, color: GREY, lineHeight: 1.5 }}>
-                Data is saved in this browser on this device{driveConnected ? ", and mirrored to your Google Drive." : "."}
-              </div>
-            </div>
           </div>
         )}
 
