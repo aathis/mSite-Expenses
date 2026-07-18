@@ -54,7 +54,7 @@ Mestri (Velu), Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, 
 4. Keep the Drive scope to `drive.file` only — never widen it to full Drive access.
 
 ## Deployment
-GitHub Pages: push repo, upload/commit `dist/index.html` (or configure Pages to serve it), site at `https://<username>.github.io/<repo>/`. Free GitHub Pages requires a public repo — safe because no data is embedded.
+GitHub Pages, deployed via `.github/workflows/deploy.yml` (GitHub Actions builds `dist/` fresh on every push to `main` and publishes it — `dist/` is gitignored, never committed). Site is at `https://aathis.github.io/mSite-Expenses/`. The repo itself is **private** — GitHub Pages works fine from a private repo, the published site is just publicly reachable regardless, which is why rules 1–2 above matter.
 
 ## Roadmap ideas the user has not confirmed yet (ask before building)
 - Edit existing expense entries (currently only add/delete).
