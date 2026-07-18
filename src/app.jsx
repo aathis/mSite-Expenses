@@ -11,6 +11,7 @@ import {
 } from "./drive.js";
 
 const STORAGE_KEY = "msite-construction-expenses-v1";
+const LOCAL_MODIFIED_KEY = "msite-local-modified";
 const INK = "#1D1B16";
 const CONCRETE = "#EAE8E3";
 const YELLOW = "#F5B700";
@@ -74,17 +75,73 @@ function MSiteTracker() {
   const [newCatMode, setNewCatMode] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
-  useEffect(() => {
-    setExpenses(loadStored());
-  }, []);
+  // Hidden one-time import, only reachable via ?seed in the URL.
+  // Generic code only — the data itself comes from a local file the user picks.
+  const seedMode = new URLSearchParams(window.location.search).has("seed");
 
-  const persist = (next) => {
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2800);
+  };
+
+  const adoptExpenses = (next) => {
     setExpenses(next);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(LOCAL_MODIFIED_KEY, new Date().toISOString());
     } catch (e) {
       setError("Could not save data in this browser. Changes may not persist.");
     }
+  };
+
+  // Decide which side is the source of truth and make both match.
+  // Never lets an empty side silently wipe out a non-empty one.
+  const syncWithDrive = async (localExpenses) => {
+    const res = await restoreFromDrive();
+    if (!res.ok && res.notFound) {
+      if (localExpenses.length > 0) {
+        const up = await backupExpensesToDrive(localExpenses);
+        if (up.ok) setLastBackup(up.at);
+      }
+      return;
+    }
+    if (!res.ok) {
+      setDriveMessage(res.error || "Could not check Drive for the latest data.");
+      return;
+    }
+    const drive = res.expenses;
+    if (drive.length === 0 && localExpenses.length === 0) return;
+    if (localExpenses.length === 0 && drive.length > 0) {
+      adoptExpenses(drive);
+      showToast(drive.length + " expenses loaded from Google Drive");
+      return;
+    }
+    if (drive.length === 0 && localExpenses.length > 0) {
+      const up = await backupExpensesToDrive(localExpenses);
+      if (up.ok) setLastBackup(up.at);
+      return;
+    }
+    const localMod = localStorage.getItem(LOCAL_MODIFIED_KEY);
+    const driveNewer = res.savedAt && (!localMod || new Date(res.savedAt) > new Date(localMod));
+    if (driveNewer) {
+      adoptExpenses(drive);
+      showToast(drive.length + " expenses loaded from Google Drive");
+    } else {
+      const up = await backupExpensesToDrive(localExpenses);
+      if (up.ok) setLastBackup(up.at);
+    }
+  };
+
+  useEffect(() => {
+    const stored = loadStored();
+    setExpenses(stored);
+    if (isDriveConnected()) {
+      syncWithDrive(stored);
+    }
+  }, []);
+
+  const persist = (next) => {
+    adoptExpenses(next);
     if (isDriveConnected()) {
       backupExpensesToDrive(next).then((res) => {
         if (res.ok) {
@@ -97,23 +154,15 @@ function MSiteTracker() {
     }
   };
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2800);
-  };
-
   const handleConnectDrive = () => {
     setDriveBusy(true);
     setDriveMessage("");
     connectDrive()
-      .then(() => {
+      .then(async () => {
         setDriveConnected(true);
-        setDriveBusy(false);
         showToast("Google Drive connected");
-        return backupExpensesToDrive(expenses);
-      })
-      .then((res) => {
-        if (res && res.ok) setLastBackup(res.at);
+        await syncWithDrive(expenses || []);
+        setDriveBusy(false);
       })
       .catch((e) => {
         setDriveBusy(false);
@@ -130,6 +179,10 @@ function MSiteTracker() {
   };
 
   const handleBackupNow = () => {
+    if (!expenses || expenses.length === 0) {
+      setDriveMessage("Nothing to back up on this device. Use Restore from Drive to load your data first.");
+      return;
+    }
     setDriveBusy(true);
     setDriveMessage("");
     backupExpensesToDrive(expenses).then((res) => {
@@ -160,6 +213,39 @@ function MSiteTracker() {
         setDriveMessage(res.error || "Restore from Drive failed.");
       }
     });
+  };
+
+  const importSeedFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(reader.result);
+        const arr = Array.isArray(raw) ? raw : raw.expenses;
+        if (!Array.isArray(arr)) throw new Error("bad shape");
+        let sum = 0;
+        const items = arr
+          .map((r, i) => ({
+            id: r.id || "seed-" + Date.now() + "-" + i,
+            date: (r.date || "").trim(),
+            paidTo: (r.paidTo || r.paid_to || "").trim(),
+            amount: parseFloat(r.amount),
+            category: (r.category || "").trim() || "Misc & Tips",
+            notes: (r.notes || "").trim(),
+          }))
+          .filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.paidTo && !isNaN(e.amount));
+        if (items.length === 0) {
+          setError("No valid entries found in that file.");
+          return;
+        }
+        items.forEach((e) => (sum += e.amount));
+        setError("");
+        persist([...(expenses || []), ...items]);
+        showToast(items.length + " expenses imported — " + inr(sum));
+      } catch (e) {
+        setError("Could not read that file. It should be the JSON seed file.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const addExpense = () => {
@@ -373,6 +459,26 @@ function MSiteTracker() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+              </>
+            )}
+
+            {seedMode && (
+              <>
+                <div style={S.sectionLabel}>ONE-TIME IMPORT</div>
+                <div style={{ ...S.card, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={(e) => {
+                      const f = e.target.files && e.target.files[0];
+                      if (f) importSeedFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <div style={{ flexBasis: "100%", fontSize: 12.5, color: GREY, lineHeight: 1.5 }}>
+                    Pick the seed JSON file to load your records. If Drive is connected, they back up automatically. Remove ?seed from the address to hide this.
+                  </div>
                 </div>
               </>
             )}

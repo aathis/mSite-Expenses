@@ -20,6 +20,8 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 - `src/config.js` holds `GOOGLE_CLIENT_ID` (a public OAuth Client ID, safe to commit — not a secret) plus the `drive.appdata` scope (least-privilege: this only grants access to the hidden per-app data folder, nothing else in Drive — `drive.file` does NOT cover appDataFolder, a common mix-up) and the fixed backup filename.
 - `src/drive.js` handles sign-in (Google Identity Services token client) and backup (Drive REST API v3, `appDataFolder` — a hidden per-app folder, invisible in the user's normal Drive UI). One file is created once, then updated in place on every change (never a new file per backup).
 - Backups are best-effort and non-blocking: if offline or the token needs re-consent, `persist()` still saves to localStorage; the UI just shows a small inline message rather than failing the save.
+- **Auto-sync on open**: when connected, the app pulls the Drive backup on every load and reconciles — empty local adopts Drive, empty Drive gets the local copy pushed up, and when both sides have data the newer one (Drive `savedAt` vs the `msite-local-modified` localStorage timestamp) wins. This is what makes the same data appear on any device after sign-in. Neither side can silently wipe the other; "Back up now" also refuses to run from an empty device.
+- **Hidden one-time import**: adding `?seed` to the URL shows a pick-a-JSON-file import card (generic code only — no personal data in the build). Used once with the seed file from `scripts/seed-local-data.mjs`; kept for emergencies.
 - Google Cloud project: "mSite Expenses" (project ID `msite-expenses`), OAuth consent screen in Testing mode with the owner as the only test user. The Client ID's authorized JavaScript origins need updating whenever the deployment URL changes (currently only `http://localhost:8000` is registered — add the real GitHub Pages URL once deployed).
 
 ## Build & run
@@ -56,10 +58,12 @@ Mestri, Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, Cement,
 ## Deployment
 GitHub Pages, deployed via `.github/workflows/deploy.yml` (GitHub Actions builds `dist/` fresh on every push to `main` and publishes it — `dist/` is gitignored, never committed). Site is at `https://aathis.github.io/mSite-Expenses/`. The repo itself is **private** — GitHub Pages works fine from a private repo, the published site is just publicly reachable regardless, which is why rules 1–2 above matter.
 
+## PWA (implemented)
+`assets/` holds `manifest.webmanifest`, `sw.js` (network-first navigation with cache fallback for offline opens), and hazard-stripe icons (192/512). `scripts/build.mjs` copies them into `dist/` and injects the manifest link, apple-touch-icon, theme-color, and service-worker registration into the built HTML. The user installs it from Chrome's "Add to Home screen" for an app-icon experience on the phone.
+
 ## Roadmap ideas the user has not confirmed yet (ask before building)
 - Edit existing expense entries (currently only add/delete).
 - Simple passcode screen on app open.
-- PWA support (installable, offline, home-screen icon).
 - Track pending/owed payments (e.g. amounts pending to contractors).
 
 ## Working style for this user
