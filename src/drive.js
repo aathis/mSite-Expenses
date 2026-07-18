@@ -153,6 +153,25 @@ async function updateBackupFile(token, fileId, content) {
 }
 
 // Best-effort: never throws. Callers get back a status object instead.
+export async function restoreFromDrive() {
+  if (!isDriveConnected()) return { ok: false, error: "Connect Google Drive first." };
+  try {
+    const token = await ensureToken();
+    const fileId = await findExistingFileId(token);
+    if (!fileId) return { ok: false, error: "No backup found in Drive yet." };
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: "Bearer " + token } }
+    );
+    if (!res.ok) throw new Error("Could not read the Drive backup file.");
+    const data = await res.json();
+    return { ok: true, expenses: Array.isArray(data.expenses) ? data.expenses : [] };
+  } catch (e) {
+    return { ok: false, error: e.message || "Restore from Drive failed." };
+  }
+}
+
+// Best-effort: never throws. Callers get back a status object instead.
 export async function backupExpensesToDrive(expenses) {
   if (!isDriveConnected()) return { ok: false, skipped: true };
   try {
