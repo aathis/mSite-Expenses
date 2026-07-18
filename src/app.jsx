@@ -48,8 +48,22 @@ function migrateCategories(list) {
   if (!Array.isArray(list)) return { migrated: [], changed: false };
   let changed = false;
   const migrated = list.map(item => {
-    if (item && typeof item === "object" && typeof item.category === "string") {
-      let currentCat = item.category;
+    if (item && typeof item === "object") {
+      let updatedItem = { ...item };
+      const pTo = (updatedItem.paidTo || "").trim();
+      const nts = (updatedItem.notes || "").trim();
+      
+      if (pTo && nts && pTo !== nts && !nts.startsWith(pTo)) {
+        updatedItem.notes = `${pTo} — ${nts}`;
+        updatedItem.paidTo = "";
+        changed = true;
+      } else if (pTo && !nts) {
+        updatedItem.notes = pTo;
+        updatedItem.paidTo = "";
+        changed = true;
+      }
+
+      let currentCat = updatedItem.category || "Misc & Tips";
       const catNorm = currentCat.trim().toLowerCase();
       
       // 1. Map voice transcription and variations like Mestri Velu, Mestri velu, MestriVelu, Mestrivelu, Miss Srivelu, Miss Sri Velu, etc.
@@ -64,21 +78,18 @@ function migrateCategories(list) {
         currentCat = "Mestri";
         changed = true;
       }
-      // Also map "Miss Sri" or "Miss sri" voice transcription to "Mestri"
       else if (catNorm === "miss sri" || catNorm === "miss-sri") {
         currentCat = "Mestri";
         changed = true;
       }
-      // 2. Segregate "Electrical & Plumbing" into "Electrical & Plumbing" (Chandru) and "Hardware items" (rest)
       else if (
         catNorm === "electrical & plumbing" ||
         catNorm === "electrical and plumbing" ||
         catNorm === "electrical" ||
         catNorm === "plumbing"
       ) {
-        const notesText = (item.notes || "").toLowerCase();
-        const paidToText = (item.paidTo || "").toLowerCase();
-        const isChandru = notesText.includes("chandru") || paidToText.includes("chandru");
+        const notesText = (updatedItem.notes || "").toLowerCase();
+        const isChandru = notesText.includes("chandru");
         
         if (isChandru) {
           if (currentCat !== "Electrical & Plumbing") {
@@ -92,7 +103,6 @@ function migrateCategories(list) {
           }
         }
       }
-      // 3. Merge "Sand & Jelly" and "Hollow blocks" into "Sand & Blocks"
       else if (
         catNorm === "sand & jelly" ||
         catNorm === "sand and jelly" ||
@@ -113,14 +123,14 @@ function migrateCategories(list) {
         }
       }
       
-      if (item.category !== currentCat) {
-        return { ...item, category: currentCat };
-      }
+      updatedItem.category = currentCat;
+      return updatedItem;
     }
     return item;
   });
   return { migrated, changed };
 }
+
 
 function loadStored() {
   try {
@@ -678,7 +688,7 @@ function MSiteTracker() {
                         >
                           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                             <span style={{ ...S.catName, textDecoration: hoveredCat === c.name ? "underline" : "none", color: hoveredCat === c.name ? "var(--color-text)" : "inherit" }}>
-                              {c.name} →
+                              {c.name}
                             </span>
                             <span style={S.catAmt}>{inr(c.value)}</span>
                           </div>
@@ -687,7 +697,7 @@ function MSiteTracker() {
                               style={{
                                 ...S.barFill,
                                 width: (c.value / byCategory[0].value) * 100 + "%",
-                                background: i === 0 ? YELLOW : "var(--color-text)",
+                                background: "var(--color-text)",
                               }}
                             />
                           </div>
@@ -712,15 +722,19 @@ function MSiteTracker() {
                           <YAxis hide />
                           <Tooltip
                             formatter={(v) => [inr(v), "Spent"]}
+                            cursor={{ fill: isDarkMode ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.04)" }}
                             contentStyle={{
                               fontFamily: "'IBM Plex Mono', monospace",
                               fontSize: 12,
                               border: "1px solid var(--color-text)",
-                              borderRadius: 0,
+                              borderRadius: 4,
                               background: "var(--color-bg-card)",
                               color: "var(--color-text)",
                             }}
+                            itemStyle={{ color: "var(--color-text)", fontFamily: "'IBM Plex Mono', monospace" }}
+                            labelStyle={{ color: "var(--color-text-grey)", fontFamily: "'IBM Plex Mono', monospace" }}
                           />
+
                           <Bar dataKey="value" radius={[2, 2, 0, 0]}>
                             {byMonth.map((_, i) => (
                               <Cell key={i} fill={isDarkMode ? "#F2EFE9" : "#1D1B16"} />
@@ -879,6 +893,9 @@ function MSiteTracker() {
           <div style={S.footer}>
             <div>Total entries: {expenses.length}</div>
             {lastModified && <div style={{ marginTop: 4 }}>Last updated time: {fmtDateTime(lastModified)}</div>}
+            <div style={{ marginTop: 8, fontSize: 11.5, letterSpacing: "0.04em", opacity: 0.85 }}>
+              Developed by Karthik Srinivas
+            </div>
           </div>
         )}
       </div>
@@ -889,7 +906,8 @@ function MSiteTracker() {
           <div style={S.modalContent} className={`bottom-sheet-content ${isClosing ? "closing" : ""}`} onClick={(e) => e.stopPropagation()}>
             <div className="bottom-sheet-handle" />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Edit expense details</h3>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>Edit expense details</h3>
+
               <button
                 style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--color-text)" }}
                 onClick={closeBottomSheet}
@@ -991,9 +1009,9 @@ function MSiteTracker() {
 
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap');
-* { box-sizing: border-box; }
-input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 1px; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', system-ui, sans-serif; }
 .formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
 @media (max-width: 480px) { .formGrid { grid-template-columns: 1fr; gap: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
@@ -1223,13 +1241,14 @@ const S = {
   page: { minHeight: "100%", background: "var(--color-bg-page)", color: "var(--color-text)", fontFamily: "'Space Grotesk', system-ui, sans-serif" },
   header: { background: "var(--color-bg-card)", borderBottom: "1px solid var(--color-border)", position: "sticky", top: 0, zIndex: 10 },
   headInner: { maxWidth: "100%", margin: "0 auto" },
-  content: { padding: "0 16px 80px", maxWidth: "100%", margin: "0 auto" },
+  content: { padding: "0 16px 28px", maxWidth: "100%", margin: "0 auto" },
   hazard: { height: 8, background: `repeating-linear-gradient(45deg, ${YELLOW} 0 12px, var(--color-text) 12px 24px)` },
   eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: "var(--color-text-grey)", marginBottom: 6 },
   totalRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
   totalAmount: { fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 30, letterSpacing: "-0.01em" },
   totalMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)" },
-  footer: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)", textAlign: "center", marginTop: 40, marginBottom: 20 },
+  footer: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)", textAlign: "center", marginTop: 32, marginBottom: 16 },
+
   tabs: { display: "flex", borderTop: "1px solid var(--color-tab-border)" },
   tab: {
     flex: 1, padding: "12px 4px", background: "none", border: "none",
