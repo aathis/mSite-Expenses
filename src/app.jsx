@@ -44,6 +44,19 @@ const fmtDateTime = (iso) => {
   });
 };
 
+function migrateCategories(list) {
+  if (!Array.isArray(list)) return { migrated: [], changed: false };
+  let changed = false;
+  const migrated = list.map(item => {
+    if (item && typeof item === "object" && (item.category === "Mestri Velu" || item.category === "Mestri velu")) {
+      changed = true;
+      return { ...item, category: "Mestri" };
+    }
+    return item;
+  });
+  return { migrated, changed };
+}
+
 function loadStored() {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
@@ -104,11 +117,16 @@ function MSiteTracker() {
       setDriveMessage(res.error || "Could not check Drive for the latest data.");
       return;
     }
-    const drive = res.expenses;
+    const driveRaw = res.expenses || [];
+    const { migrated: drive, changed: driveChanged } = migrateCategories(driveRaw);
     if (drive.length === 0 && localExpenses.length === 0) return;
     if (localExpenses.length === 0 && drive.length > 0) {
       adoptExpenses(drive);
       showToast(drive.length + " expenses loaded from Google Drive");
+      if (driveChanged) {
+        const up = await backupExpensesToDrive(drive);
+        if (up.ok) setLastBackup(up.at);
+      }
       return;
     }
     if (drive.length === 0 && localExpenses.length > 0) {
@@ -121,6 +139,10 @@ function MSiteTracker() {
     if (driveNewer) {
       adoptExpenses(drive);
       showToast(drive.length + " expenses loaded from Google Drive");
+      if (driveChanged) {
+        const up = await backupExpensesToDrive(drive);
+        if (up.ok) setLastBackup(up.at);
+      }
     } else {
       const up = await backupExpensesToDrive(localExpenses);
       if (up.ok) setLastBackup(up.at);
@@ -129,9 +151,13 @@ function MSiteTracker() {
 
   useEffect(() => {
     const stored = loadStored();
-    setExpenses(stored);
+    const { migrated, changed } = migrateCategories(stored);
+    setExpenses(migrated);
+    if (changed) {
+      adoptExpenses(migrated);
+    }
     if (isDriveConnected()) {
-      syncWithDrive(stored);
+      syncWithDrive(migrated);
     }
   }, []);
 
