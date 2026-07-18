@@ -292,14 +292,22 @@ function MSiteTracker() {
   }, [editingExpense]);
 
   const selectCategory = (catName) => {
+    const isNew = !selectedCategory;
     setSelectedCategory(catName);
-    window.history.replaceState({ category: catName }, "");
+    if (isNew) {
+      window.history.pushState({ category: catName }, "");
+    } else {
+      window.history.replaceState({ category: catName }, "");
+    }
   };
 
   const closeCategory = () => {
     setSelectedCategory(null);
-    window.history.replaceState(null, "");
+    if (window.history.state && window.history.state.category) {
+      window.history.back();
+    }
   };
+
 
 
   const persist = (next) => {
@@ -1278,7 +1286,7 @@ const S = {
     fontWeight: 500, border: "1px solid var(--color-input-border)", borderRadius: 999,
     background: "var(--color-input-bg)", color: "var(--color-text)", cursor: "pointer",
   },
-  chipActive: { background: "var(--color-text)", color: YELLOW, border: "1px solid var(--color-text)", fontWeight: 700 },
+  chipActive: { background: YELLOW, color: INK, border: "1px solid " + YELLOW, fontWeight: 700 },
   primaryBtn: {
     width: "100%", boxSizing: "border-box", marginTop: 20, padding: "13px", fontSize: 15, fontWeight: 700,
     fontFamily: "'Space Grotesk', sans-serif", background: YELLOW, color: INK,
@@ -1312,10 +1320,10 @@ const S = {
   },
   errorClose: { background: "none", border: "none", color: "#7A1712", cursor: "pointer", fontSize: 14, flexShrink: 0 },
   toast: {
-    position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)",
-    background: "var(--color-text)", color: YELLOW, fontFamily: "'IBM Plex Mono', monospace",
-    fontSize: 13, padding: "10px 18px", borderRadius: 6, zIndex: 1100,
-    boxShadow: "0 4px 14px rgba(0,0,0,0.25)", maxWidth: "90%", textAlign: "center", width: "max-content",
+    position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)",
+    background: "#1D1B16", color: YELLOW, fontFamily: "'IBM Plex Mono', monospace",
+    fontSize: 13, padding: "10px 18px", borderRadius: 6, border: "1px solid #35322C", zIndex: 1100,
+    boxShadow: "0 4px 14px rgba(0,0,0,0.4)", maxWidth: "90%", textAlign: "center", width: "max-content",
   },
   modalOverlay: {
     position: "absolute",
@@ -1339,15 +1347,16 @@ const S = {
     borderRight: "1px solid var(--color-border)",
     width: "100%",
     maxWidth: "100%",
-    padding: "16px 20px 32px",
-    boxShadow: "0 -8px 30px rgba(0, 0, 0, 0.25)",
-    maxHeight: "85vh",
+    boxSizing: "border-box",
+    padding: "16px 20px 28px",
+    boxShadow: "0 -8px 30px rgba(0, 0, 0, 0.35)",
+    maxHeight: "82vh",
     overflowY: "auto",
   },
 };
 
-
 export default MSiteTracker;
+
 
 if (typeof document !== "undefined") {
   const container = document.getElementById("root");
