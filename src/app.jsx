@@ -19,7 +19,7 @@ const GREY = "#8B8578";
 
 const BASE_CATS = [
   "Mestri", "Electrical & Plumbing", "Hardware items", "JCB & Tractor", "Paya & Digging",
-  "Iron bars", "Cement", "Sand & Concrete blocks", "Water tanker", "Wood work",
+  "Iron bars", "Cement", "Sand & Blocks", "Water tanker", "Wood work",
   "Misc & Tips",
 ];
 
@@ -92,7 +92,7 @@ function migrateCategories(list) {
           }
         }
       }
-      // 3. Merge "Sand & Jelly" and "Hollow blocks" into "Sand & Concrete blocks"
+      // 3. Merge "Sand & Jelly" and "Hollow blocks" into "Sand & Blocks"
       else if (
         catNorm === "sand & jelly" ||
         catNorm === "sand and jelly" ||
@@ -101,10 +101,14 @@ function migrateCategories(list) {
         catNorm === "sand & concrete blocks" ||
         catNorm === "sand and concrete blocks" ||
         catNorm === "send and concrete blocks" ||
-        catNorm === "send & concrete blocks"
+        catNorm === "send & concrete blocks" ||
+        catNorm === "sand & blocks" ||
+        catNorm === "sand and blocks" ||
+        catNorm === "send and blocks" ||
+        catNorm === "send & blocks"
       ) {
-        if (currentCat !== "Sand & Concrete blocks") {
-          currentCat = "Sand & Concrete blocks";
+        if (currentCat !== "Sand & Blocks") {
+          currentCat = "Sand & Blocks";
           changed = true;
         }
       }
