@@ -18,7 +18,7 @@ const YELLOW = "#F5B700";
 const GREY = "#8B8578";
 
 const BASE_CATS = [
-  "Mestri", "Electrical & Plumbing", "JCB & Tractor", "Paya & Digging",
+  "Mestri", "Electrical & Plumbing", "Hardware items", "JCB & Tractor", "Paya & Digging",
   "Iron bars", "Cement", "Hollow blocks", "Water tanker", "Wood work",
   "Sand & Jelly", "Misc & Tips",
 ];
@@ -49,8 +49,10 @@ function migrateCategories(list) {
   let changed = false;
   const migrated = list.map(item => {
     if (item && typeof item === "object" && typeof item.category === "string") {
-      const catNorm = item.category.trim().toLowerCase();
-      // Map voice transcription and variations like Mestri Velu, Mestri velu, MestriVelu, Mestrivelu, Miss Srivelu, Miss Sri Velu, etc.
+      let currentCat = item.category;
+      const catNorm = currentCat.trim().toLowerCase();
+      
+      // 1. Map voice transcription and variations like Mestri Velu, Mestri velu, MestriVelu, Mestrivelu, Miss Srivelu, Miss Sri Velu, etc.
       if (
         catNorm === "mestri velu" ||
         catNorm === "mestrivelu" ||
@@ -59,13 +61,40 @@ function migrateCategories(list) {
         catNorm.includes("velu") ||
         catNorm.includes("srivelu")
       ) {
+        currentCat = "Mestri";
         changed = true;
-        return { ...item, category: "Mestri" };
       }
       // Also map "Miss Sri" or "Miss sri" voice transcription to "Mestri"
-      if (catNorm === "miss sri" || catNorm === "miss-sri") {
+      else if (catNorm === "miss sri" || catNorm === "miss-sri") {
+        currentCat = "Mestri";
         changed = true;
-        return { ...item, category: "Mestri" };
+      }
+      // 2. Segregate "Electrical & Plumbing" into "Electrical & Plumbing" (Chandru) and "Hardware items" (rest)
+      else if (
+        catNorm === "electrical & plumbing" ||
+        catNorm === "electrical and plumbing" ||
+        catNorm === "electrical" ||
+        catNorm === "plumbing"
+      ) {
+        const notesText = (item.notes || "").toLowerCase();
+        const paidToText = (item.paidTo || "").toLowerCase();
+        const isChandru = notesText.includes("chandru") || paidToText.includes("chandru");
+        
+        if (isChandru) {
+          if (currentCat !== "Electrical & Plumbing") {
+            currentCat = "Electrical & Plumbing";
+            changed = true;
+          }
+        } else {
+          if (currentCat !== "Hardware items") {
+            currentCat = "Hardware items";
+            changed = true;
+          }
+        }
+      }
+      
+      if (item.category !== currentCat) {
+        return { ...item, category: currentCat };
       }
     }
     return item;
