@@ -40,7 +40,7 @@ const fmtDate = (iso) => {
 const fmtDateTime = (iso) => {
   if (!iso) return "";
   return new Date(iso).toLocaleString("en-IN", {
-    day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+    day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
   });
 };
 
@@ -384,35 +384,37 @@ function MSiteTracker() {
             )}
 
             <div style={S.sectionLabel}>GOOGLE DRIVE BACKUP</div>
-            <div style={{ ...S.card, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {driveConnected ? (
-                <>
-                  <span style={{ fontSize: 13.5 }}>
-                    <strong>Connected.</strong>{" "}
-                    {lastBackup ? "Last backup: " + fmtDateTime(lastBackup) : "Will back up on your next change."}
-                  </span>
-                  <button style={{ ...S.ghostBtn, marginLeft: "auto" }} onClick={handleDisconnectDrive}>
-                    Disconnect
-                  </button>
-                </>
-              ) : (
-                <button
-                  style={{ ...S.primaryBtn, width: "auto", marginTop: 0, padding: "9px 16px", fontSize: 13 }}
-                  onClick={handleConnectDrive}
-                  disabled={driveBusy}
-                >
-                  {driveBusy ? "Connecting…" : "Connect Google Drive"}
-                </button>
-              )}
+            <div style={S.card}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ ...S.statusDot, background: driveConnected ? "#1E8E3E" : "#B3261E" }} />
+                <span style={{ fontWeight: 700, fontSize: 15 }}>
+                  {driveConnected ? "Connected" : "Disconnected"}
+                </span>
+              </div>
+              <div style={{ fontSize: 12.5, color: GREY, lineHeight: 1.5, marginTop: 6 }}>
+                {driveConnected
+                  ? (lastBackup
+                      ? "Your data was last backed up on " + fmtDateTime(lastBackup) + "."
+                      : "Your data will be backed up on your next change.")
+                  : "Connect once and every future change is backed up automatically."}
+              </div>
               {driveMessage && (
-                <div style={{ flexBasis: "100%", fontSize: 12.5, color: "#B3261E", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12.5, color: "#B3261E", lineHeight: 1.5, marginTop: 6 }}>
                   {driveMessage}
                 </div>
               )}
-              <div style={{ flexBasis: "100%", fontSize: 12.5, color: GREY, lineHeight: 1.5 }}>
-                {driveConnected
-                  ? "Every expense you add or delete is backed up automatically to a hidden folder in your Drive that only this app can see."
-                  : "Connect once and every future change is backed up automatically — no need to remember to export anything."}
+              <div style={{ marginTop: 14 }}>
+                {driveConnected ? (
+                  <button style={S.ghostBtn} onClick={handleDisconnectDrive}>Disconnect</button>
+                ) : (
+                  <button
+                    style={{ ...S.primaryBtn, width: "auto", marginTop: 0, padding: "9px 16px", fontSize: 13 }}
+                    onClick={handleConnectDrive}
+                    disabled={driveBusy}
+                  >
+                    {driveBusy ? "Connecting…" : "Connect Google Drive"}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -563,6 +565,7 @@ const S = {
   tabActive: { color: INK, borderBottom: "3px solid " + YELLOW, fontWeight: 700 },
   sectionLabel: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: GREY, margin: "18px 2px 8px" },
   card: { background: "#FFFFFF", border: "1px solid #D8D5CD", borderRadius: 6, padding: 16 },
+  statusDot: { width: 9, height: 9, borderRadius: "50%", display: "inline-block", flexShrink: 0 },
   catName: { fontSize: 13.5, fontWeight: 500 },
   catAmt: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600 },
   barTrack: { height: 6, background: "#EFEDE8", borderRadius: 3, overflow: "hidden" },
