@@ -172,6 +172,7 @@ function MSiteTracker() {
 
   // Edit Expense States
   const [editingExpense, setEditingExpense] = useState(null);
+  const [isClosing, setIsClosing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editAmount, setEditAmount] = useState("");
   const [editDate, setEditDate] = useState("");
@@ -355,7 +356,16 @@ function MSiteTracker() {
     showToast("Expense deleted");
   };
 
+  const closeBottomSheet = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setEditingExpense(null);
+      setIsClosing(false);
+    }, 230);
+  };
+
   const startEditing = (e) => {
+    setIsClosing(false);
     setEditingExpense(e);
     setEditName(e.paidTo || "");
     setEditAmount(e.amount.toString());
@@ -398,7 +408,7 @@ function MSiteTracker() {
     });
 
     persist(updatedExpenses);
-    setEditingExpense(null);
+    closeBottomSheet();
     showToast("Expense updated");
   };
 
@@ -851,25 +861,26 @@ function MSiteTracker() {
       </div>
 
       {editingExpense && (
-        <div style={S.modalOverlay} onClick={() => setEditingExpense(null)}>
-          <div style={S.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={S.modalOverlay} className={`bottom-sheet-overlay ${isClosing ? "closing" : ""}`} onClick={closeBottomSheet}>
+          <div style={S.modalContent} className={`bottom-sheet-content ${isClosing ? "closing" : ""}`} onClick={(e) => e.stopPropagation()}>
+            <div className="bottom-sheet-handle" />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Edit expense details</h3>
               <button
                 style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--color-text)" }}
-                onClick={() => setEditingExpense(null)}
+                onClick={closeBottomSheet}
               >
                 ✕
               </button>
             </div>
-
+ 
             {editError && (
               <div style={{ ...S.errorBox, margin: "0 0 16px 0" }}>
                 <span>{editError}</span>
                 <button style={S.errorClose} onClick={() => setEditError("")}>✕</button>
               </div>
             )}
-
+ 
             <div style={S.formLabel}>Name / Paid to</div>
             <input
               value={editName}
@@ -877,7 +888,7 @@ function MSiteTracker() {
               placeholder="e.g. Mestri, Hardware items"
               style={S.input}
             />
-
+ 
             <div className="formGrid" style={{ marginTop: 12 }}>
               <div>
                 <div style={S.formLabel}>Date</div>
@@ -900,7 +911,7 @@ function MSiteTracker() {
                 />
               </div>
             </div>
-
+ 
             <div style={S.formLabel}>Category</div>
             <select
               value={editNewCatMode ? "__new__" : editCat}
@@ -919,7 +930,7 @@ function MSiteTracker() {
               ))}
               <option value="__new__">+ New category</option>
             </select>
-
+ 
             {editNewCatMode && (
               <input
                 value={editNewCatName}
@@ -928,7 +939,7 @@ function MSiteTracker() {
                 style={{ ...S.input, marginTop: 8 }}
               />
             )}
-
+ 
             <div style={S.formLabel}>Notes</div>
             <input
               value={editNotes}
@@ -936,11 +947,11 @@ function MSiteTracker() {
               placeholder="e.g. Paid via PhonePe"
               style={S.input}
             />
-
+ 
             <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
               <button
                 style={{ ...S.ghostBtn, flex: 1, padding: "12px" }}
-                onClick={() => setEditingExpense(null)}
+                onClick={closeBottomSheet}
               >
                 Cancel
               </button>
@@ -1005,6 +1016,67 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
 }
 .expense-row:active {
   transform: translateY(0);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.bottom-sheet-overlay {
+  animation: fadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bottom-sheet-overlay.closing {
+  animation: fadeOut 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bottom-sheet-content {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bottom-sheet-content.closing {
+  animation: slideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bottom-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background-color: var(--color-input-border);
+  border-radius: 2px;
+  margin: -6px auto 14px;
+  opacity: 0.6;
 }
 `;
 
@@ -1092,22 +1164,25 @@ const S = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backdropFilter: "blur(4px)",
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "center",
     zIndex: 1000,
-    padding: 16,
   },
   modalContent: {
     background: "var(--color-bg-card)",
-    border: "1px solid var(--color-border)",
-    borderRadius: 8,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderTop: "1px solid var(--color-border)",
+    borderLeft: "1px solid var(--color-border)",
+    borderRight: "1px solid var(--color-border)",
     width: "100%",
-    maxWidth: 500,
-    padding: 20,
-    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.3)",
-    maxHeight: "90vh",
+    maxWidth: 600,
+    padding: "16px 20px 32px",
+    boxShadow: "0 -8px 30px rgba(0, 0, 0, 0.25)",
+    maxHeight: "85vh",
     overflowY: "auto",
   },
 };

@@ -3,3 +3,6 @@ dist/
 # NEVER commit personal expense data
 data/
 *.local.js
+.env
+.antigravity/
+tmp/
