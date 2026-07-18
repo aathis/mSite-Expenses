@@ -1039,11 +1039,10 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
   height: 824px;
   max-height: calc(100vh - 80px);
   background-color: var(--color-bg-page);
-  border-radius: 40px;
+  border-radius: 20px;
   box-shadow: 
-    0 25px 60px -15px rgba(0, 0, 0, 0.8), 
-    0 0 0 10px #1A1B20, 
-    0 0 0 11px rgba(255, 255, 255, 0.12);
+    0 20px 50px -10px rgba(0, 0, 0, 0.65), 
+    0 0 0 1px var(--color-border);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1103,15 +1102,15 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
 
 :root.dark-theme {
   --color-bg-page: #121210;
-  --color-text: #F2EFE9;
-  --color-bg-card: #22201C;
-  --color-border: #3E3B35;
-  --color-text-grey: #A19C91;
-  --color-track: #32302A;
-  --color-input-bg: #2B2924;
-  --color-input-border: #4D4941;
-  --color-notes: #C4BFB4;
-  --color-tab-border: #2E2C27;
+  --color-text: #E5E2DA;
+  --color-bg-card: #1F1D19;
+  --color-border: #3A3731;
+  --color-text-grey: #9A958A;
+  --color-track: #2E2C26;
+  --color-input-bg: #26241F;
+  --color-input-border: #47433B;
+  --color-notes: #BBB6AA;
+  --color-tab-border: #2B2924;
 }
 
 .expense-row {
