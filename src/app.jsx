@@ -170,6 +170,17 @@ function MSiteTracker() {
   const [newCatMode, setNewCatMode] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
+  // Edit Expense States
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editCat, setEditCat] = useState("");
+  const [editNewCatMode, setEditNewCatMode] = useState(false);
+  const [editNewCatName, setEditNewCatName] = useState("");
+  const [editError, setEditError] = useState("");
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 2800);
@@ -342,6 +353,53 @@ function MSiteTracker() {
     persist(expenses.filter((e) => e.id !== id));
     setConfirmId(null);
     showToast("Expense deleted");
+  };
+
+  const startEditing = (e) => {
+    setEditingExpense(e);
+    setEditName(e.paidTo || "");
+    setEditAmount(e.amount.toString());
+    setEditDate(e.date);
+    setEditNotes(e.notes || "");
+    setEditCat(e.category);
+    setEditNewCatMode(false);
+    setEditNewCatName("");
+    setEditError("");
+  };
+
+  const saveEditedExpense = () => {
+    const amt = parseFloat(editAmount);
+    let cat = editCat;
+    if (editNewCatMode) {
+      if (!editNewCatName.trim()) {
+        setEditError("Type a name for the new category, or pick an existing one.");
+        return;
+      }
+      cat = editNewCatName.trim();
+    }
+    if (!editDate || isNaN(amt) || amt <= 0 || !editNotes.trim()) {
+      setEditError("Enter a date, an amount above zero, and a note describing the expense.");
+      return;
+    }
+    setEditError("");
+
+    const updatedExpenses = expenses.map((e) => {
+      if (e.id === editingExpense.id) {
+        return {
+          ...e,
+          paidTo: editName.trim(),
+          amount: amt,
+          date: editDate,
+          notes: editNotes.trim(),
+          category: cat,
+        };
+      }
+      return e;
+    });
+
+    persist(updatedExpenses);
+    setEditingExpense(null);
+    showToast("Expense updated");
   };
 
   const total = useMemo(
@@ -526,7 +584,7 @@ function MSiteTracker() {
               </div>
             ) : (
               catExpenses.map((e) => (
-                <div key={e.id} style={S.row}>
+                <div key={e.id} className="expense-row" style={S.row} onClick={() => startEditing(e)}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
                     <div style={S.rowMeta}>{fmtDate(e.date)}</div>
@@ -535,12 +593,12 @@ function MSiteTracker() {
                   <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
                     <div style={S.rowAmt}>{inr(e.amount)}</div>
                     {confirmId === e.id ? (
-                      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                        <button style={S.dangerBtn} onClick={() => deleteExpense(e.id)}>Delete</button>
-                        <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>✕</button>
+                      <div style={{ display: "flex", gap: 6, marginTop: 6 }} onClick={(ev) => ev.stopPropagation()}>
+                        <button style={S.dangerBtn} onClick={(ev) => { ev.stopPropagation(); deleteExpense(e.id); }}>Delete</button>
+                        <button style={S.ghostBtn} onClick={(ev) => { ev.stopPropagation(); setConfirmId(null); }}>✕</button>
                       </div>
                     ) : (
-                      <button style={S.deleteLink} onClick={() => setConfirmId(e.id)}>Delete</button>
+                      <button style={S.deleteLink} onClick={(ev) => { ev.stopPropagation(); setConfirmId(e.id); }}>Delete</button>
                     )}
                   </div>
                 </div>
@@ -761,7 +819,7 @@ function MSiteTracker() {
                 )}
 
                 {filtered.map((e) => (
-                  <div key={e.id} style={S.row}>
+                  <div key={e.id} className="expense-row" style={S.row} onClick={() => startEditing(e)}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
                       <div style={S.rowMeta}>{fmtDate(e.date)} · {e.category}</div>
@@ -770,12 +828,12 @@ function MSiteTracker() {
                     <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
                       <div style={S.rowAmt}>{inr(e.amount)}</div>
                       {confirmId === e.id ? (
-                        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                          <button style={S.dangerBtn} onClick={() => deleteExpense(e.id)}>Delete</button>
-                          <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>✕</button>
+                        <div style={{ display: "flex", gap: 6, marginTop: 6 }} onClick={(ev) => ev.stopPropagation()}>
+                          <button style={S.dangerBtn} onClick={(ev) => { ev.stopPropagation(); deleteExpense(e.id); }}>Delete</button>
+                          <button style={S.ghostBtn} onClick={(ev) => { ev.stopPropagation(); setConfirmId(null); }}>✕</button>
                         </div>
                       ) : (
-                        <button style={S.deleteLink} onClick={() => setConfirmId(e.id)}>Delete</button>
+                        <button style={S.deleteLink} onClick={(ev) => { ev.stopPropagation(); setConfirmId(e.id); }}>Delete</button>
                       )}
                     </div>
                   </div>
@@ -791,6 +849,111 @@ function MSiteTracker() {
           </div>
         )}
       </div>
+
+      {editingExpense && (
+        <div style={S.modalOverlay} onClick={() => setEditingExpense(null)}>
+          <div style={S.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Edit expense details</h3>
+              <button
+                style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--color-text)" }}
+                onClick={() => setEditingExpense(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {editError && (
+              <div style={{ ...S.errorBox, margin: "0 0 16px 0" }}>
+                <span>{editError}</span>
+                <button style={S.errorClose} onClick={() => setEditError("")}>✕</button>
+              </div>
+            )}
+
+            <div style={S.formLabel}>Name / Paid to</div>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="e.g. Mestri, Hardware items"
+              style={S.input}
+            />
+
+            <div className="formGrid" style={{ marginTop: 12 }}>
+              <div>
+                <div style={S.formLabel}>Date</div>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  style={S.input}
+                />
+              </div>
+              <div>
+                <div style={S.formLabel}>Amount (₹)</div>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  placeholder="0"
+                  style={S.input}
+                />
+              </div>
+            </div>
+
+            <div style={S.formLabel}>Category</div>
+            <select
+              value={editNewCatMode ? "__new__" : editCat}
+              onChange={(e) => {
+                if (e.target.value === "__new__") {
+                  setEditNewCatMode(true);
+                } else {
+                  setEditNewCatMode(false);
+                  setEditCat(e.target.value);
+                }
+              }}
+              style={S.input}
+            >
+              {allCats.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+              <option value="__new__">+ New category</option>
+            </select>
+
+            {editNewCatMode && (
+              <input
+                value={editNewCatName}
+                onChange={(e) => setEditNewCatName(e.target.value)}
+                placeholder="New category name, e.g. Painting"
+                style={{ ...S.input, marginTop: 8 }}
+              />
+            )}
+
+            <div style={S.formLabel}>Notes</div>
+            <input
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="e.g. Paid via PhonePe"
+              style={S.input}
+            />
+
+            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+              <button
+                style={{ ...S.ghostBtn, flex: 1, padding: "12px" }}
+                onClick={() => setEditingExpense(null)}
+              >
+                Cancel
+              </button>
+              <button
+                style={{ ...S.primaryBtn, flex: 1, marginTop: 0, padding: "12px" }}
+                onClick={saveEditedExpense}
+              >
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && <div style={S.toast}>{toast}</div>}
     </div>
@@ -829,6 +992,19 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
   --color-input-border: #4D4941;
   --color-notes: #C4BFB4;
   --color-tab-border: #2E2C27;
+}
+
+.expense-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.expense-row:hover {
+  background-color: var(--color-track) !important;
+  border-color: var(--color-input-border) !important;
+  transform: translateY(-1px);
+}
+.expense-row:active {
+  transform: translateY(0);
 }
 `;
 
@@ -909,6 +1085,30 @@ const S = {
     background: "var(--color-text)", color: YELLOW, fontFamily: "'IBM Plex Mono', monospace",
     fontSize: 13, padding: "10px 18px", borderRadius: 6, zIndex: 100,
     boxShadow: "0 4px 14px rgba(0,0,0,0.25)", maxWidth: "92vw", textAlign: "center",
+  },
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: 16,
+  },
+  modalContent: {
+    background: "var(--color-bg-card)",
+    border: "1px solid var(--color-border)",
+    borderRadius: 8,
+    width: "100%",
+    maxWidth: 500,
+    padding: 20,
+    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.3)",
+    maxHeight: "90vh",
+    overflowY: "auto",
   },
 };
 
