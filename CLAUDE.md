@@ -12,7 +12,7 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 - React 18 + Recharts (monthly chart). No backend, no database. No CSV import/export in v1 (deliberately removed — see below).
 - esbuild bundles everything into ONE self-contained file: `dist/index.html` (inline JS, no external assets except Google Fonts and the Google Identity Services script used for Drive sign-in).
 - Persistence: browser `localStorage`, key `msite-construction-expenses-v1`, value = JSON array of expense objects.
-- Expense object shape: `{ id, date: "YYYY-MM-DD", paidTo, amount: number, category, notes }`.
+- Expense object shape: `{ id, date: "YYYY-MM-DD", paidTo, amount: number, category, notes }`. `paidTo` is a **legacy field**: the form no longer collects it (new entries store `""`), but the 191 seeded records carry their description there, so the list renders `paidTo || notes` as the row title.
 - `jsx: "automatic"` must stay set in `scripts/build.mjs` — without it esbuild compiles JSX to `React.createElement` calls that reference an undefined `React` global (app.jsx never imports React as a default import), and the whole app fails to mount.
 
 ## Google Drive auto-backup (v1 decision)
@@ -30,7 +30,7 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 
 ## Features (already implemented in src/app.jsx)
 1. **Dashboard**: total spend (Indian format, e.g. ₹1,23,456), entry count, spend-by-category horizontal bars (largest bar in safety yellow), spend-by-month bar chart, and a Google Drive backup card (connect/disconnect + last-backup time).
-2. **Add expense**: date (default today), amount, paid-to, category chips (with "+ New category"), notes. Toast on save, then jumps to Expenses tab.
+2. **Add expense**: date (default today), amount, category chips (with "+ New category"), and notes (mandatory — describes the expense; there is no separate paid-to field). Toast on save, then jumps to Expenses tab.
 3. **Expenses list**: newest first, text search (paid-to/notes/category), category filter chips, filtered count + total, per-row delete with confirm step.
 4. **Google Drive auto-backup**: see above — this replaces CSV import/export as the backup mechanism.
 5. Empty state on first run prompting the user to add their first expense.
