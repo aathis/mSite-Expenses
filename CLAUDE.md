@@ -17,7 +17,7 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 
 ## Google Drive auto-backup (v1 decision)
 - The user explicitly chose this over CSV import/export: no manual export/import step, no daily reminders — instead, every add/edit/delete automatically backs up to the user's own Google Drive.
-- `src/config.js` holds `GOOGLE_CLIENT_ID` (a public OAuth Client ID, safe to commit — not a secret) plus the `drive.file` scope (least-privilege: the app can only see files it creates itself) and the fixed backup filename.
+- `src/config.js` holds `GOOGLE_CLIENT_ID` (a public OAuth Client ID, safe to commit — not a secret) plus the `drive.appdata` scope (least-privilege: this only grants access to the hidden per-app data folder, nothing else in Drive — `drive.file` does NOT cover appDataFolder, a common mix-up) and the fixed backup filename.
 - `src/drive.js` handles sign-in (Google Identity Services token client) and backup (Drive REST API v3, `appDataFolder` — a hidden per-app folder, invisible in the user's normal Drive UI). One file is created once, then updated in place on every change (never a new file per backup).
 - Backups are best-effort and non-blocking: if offline or the token needs re-consent, `persist()` still saves to localStorage; the UI just shows a small inline message rather than failing the save.
 - Google Cloud project: "mSite Expenses" (project ID `msite-expenses`), OAuth consent screen in Testing mode with the owner as the only test user. The Client ID's authorized JavaScript origins need updating whenever the deployment URL changes (currently only `http://localhost:8000` is registered — add the real GitHub Pages URL once deployed).
@@ -51,7 +51,7 @@ Mestri, Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, Cement,
 1. The built `index.html` must NEVER contain the user's personal expense data. The app ships empty; data only enters via the Add Expense form (or the one-time personal seed, run locally). Data stays in localStorage, mirrored only to the user's own Drive appDataFolder.
 2. Never commit `data/` (the CSV with real expenses) — it is gitignored. Keep it that way. Same for any `*.local.js` seed output.
 3. The repo itself is now **public**, on top of the deployed site being public — so nothing checked into git can contain real figures. Never write actual totals, amounts, dates, or vendor names into CLAUDE.md, commit messages, code comments, or anywhere else that gets committed. Use placeholder figures in examples.
-4. Keep the Drive scope to `drive.file` only — never widen it to full Drive access.
+4. Keep the Drive scope to `drive.appdata` only — never widen it to full Drive access.
 
 ## Deployment
 GitHub Pages, deployed via `.github/workflows/deploy.yml` (GitHub Actions builds `dist/` fresh on every push to `main` and publishes it — `dist/` is gitignored, never committed). Site is at `https://aathis.github.io/mSite-Expenses/`. The repo itself is **private** — GitHub Pages works fine from a private repo, the published site is just publicly reachable regardless, which is why rules 1–2 above matter.
