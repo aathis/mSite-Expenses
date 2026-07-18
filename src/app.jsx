@@ -473,10 +473,6 @@ function MSiteTracker() {
       <div className="device-viewport">
         <style>{FONTS}</style>
         <div className="device-frame">
-          <div className="device-notch">
-            <div className="device-speaker" />
-            <div className="device-camera" />
-          </div>
           <div className="device-screen" style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: "var(--color-text-grey)", letterSpacing: "0.08em" }}>
               LOADING SITE LEDGER…
@@ -499,11 +495,6 @@ function MSiteTracker() {
       </div>
 
       <div className="device-frame">
-        <div className="device-notch">
-          <div className="device-speaker" />
-          <div className="device-camera" />
-        </div>
-
         <div className="device-screen" style={S.page}>
 
       <div style={selectedCategory ? { position: "sticky", top: 0, zIndex: 10 } : S.header}>
@@ -1058,39 +1049,6 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
   flex-direction: column;
 }
 
-.device-notch {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 104px;
-  height: 20px;
-  background-color: #1A1B20;
-  border-bottom-left-radius: 12px;
-  border-bottom-right-radius: 12px;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.device-speaker {
-  width: 32px;
-  height: 3.5px;
-  border-radius: 2px;
-  background-color: #2C2D35;
-}
-
-.device-camera {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background-color: #0E0F14;
-  border: 1px solid #2C2D35;
-}
-
 .device-screen {
   flex: 1;
   height: 100%;
@@ -1127,9 +1085,6 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
     max-height: none;
     border-radius: 0;
     box-shadow: none;
-  }
-  .device-notch {
-    display: none;
   }
 }
 
