@@ -1,6 +1,6 @@
 // Network-first for page loads so new deploys show up immediately,
 // with the cached copy as an offline fallback.
-const CACHE = "msite-shell-v1";
+const CACHE = "msite-shell-v2";
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
@@ -8,7 +8,17 @@ self.addEventListener("install", (e) => {
 });
 
 self.addEventListener("activate", (e) => {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE) {
+            return caches.delete(key);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener("fetch", (e) => {

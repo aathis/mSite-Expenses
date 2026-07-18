@@ -48,9 +48,25 @@ function migrateCategories(list) {
   if (!Array.isArray(list)) return { migrated: [], changed: false };
   let changed = false;
   const migrated = list.map(item => {
-    if (item && typeof item === "object" && (item.category === "Mestri Velu" || item.category === "Mestri velu")) {
-      changed = true;
-      return { ...item, category: "Mestri" };
+    if (item && typeof item === "object" && typeof item.category === "string") {
+      const catNorm = item.category.trim().toLowerCase();
+      // Map voice transcription and variations like Mestri Velu, Mestri velu, MestriVelu, Mestrivelu, Miss Srivelu, Miss Sri Velu, etc.
+      if (
+        catNorm === "mestri velu" ||
+        catNorm === "mestrivelu" ||
+        catNorm === "miss srivelu" ||
+        catNorm === "miss sri velu" ||
+        catNorm.includes("velu") ||
+        catNorm.includes("srivelu")
+      ) {
+        changed = true;
+        return { ...item, category: "Mestri" };
+      }
+      // Also map "Miss Sri" or "Miss sri" voice transcription to "Mestri"
+      if (catNorm === "miss sri" || catNorm === "miss-sri") {
+        changed = true;
+        return { ...item, category: "Mestri" };
+      }
     }
     return item;
   });
