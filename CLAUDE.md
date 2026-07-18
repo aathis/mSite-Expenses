@@ -4,7 +4,7 @@
 A personal web app for tracking house-construction expenses for "M-Site" (a self-built house in Karnataka, India). Built with the owner in a Claude chat; development continues here in Claude Code. The user prefers simple English and precise answers.
 
 ## Background / history
-- The user's original data lives in an Excel file ("M-Site Expenses and planning"). The construction section has **191 expense entries totalling ₹18,22,640** (June 2025 – July 2026).
+- The user's original data lives in an Excel file ("M-Site Expenses and planning"). The construction section has around 190 expense entries (see `data/msite-expenses.csv`, gitignored, for the real figures — never write actual totals/amounts into this file since it's committed to a public repo).
 - That data was exported to `data/msite-expenses.csv` (kept locally, NEVER committed — see privacy rules).
 - Earlier versions (a Claude artifact and a Replit app) were discarded. This standalone static app is the one true version.
 
@@ -27,7 +27,7 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 - Test by serving `dist/` over `http://localhost:8000` (Google sign-in requires a registered origin — plain `file://` won't work for the Drive features, though the rest of the app still works offline).
 
 ## Features (already implemented in src/app.jsx)
-1. **Dashboard**: total spend (Indian format, e.g. ₹18,22,640), entry count, spend-by-category horizontal bars (largest bar in safety yellow), spend-by-month bar chart, a Google Drive backup card (connect/disconnect + last-backup time), and a Data card (Clear all with confirm).
+1. **Dashboard**: total spend (Indian format, e.g. ₹1,23,456), entry count, spend-by-category horizontal bars (largest bar in safety yellow), spend-by-month bar chart, a Google Drive backup card (connect/disconnect + last-backup time), and a Data card (Clear all with confirm).
 2. **Add expense**: date (default today), amount, paid-to, category chips (with "+ New category"), notes. Toast on save, then jumps to Expenses tab.
 3. **Expenses list**: newest first, text search (paid-to/notes/category), category filter chips, filtered count + total, per-row delete with confirm step.
 4. **Google Drive auto-backup**: see above — this replaces CSV import/export as the backup mechanism.
@@ -50,7 +50,7 @@ Mestri (Velu), Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, 
 ## PRIVACY RULES (critical — do not break)
 1. The built `index.html` must NEVER contain the user's personal expense data. The app ships empty; data only enters via the Add Expense form (or the one-time personal seed, run locally). Data stays in localStorage, mirrored only to the user's own Drive appDataFolder.
 2. Never commit `data/` (the CSV with real expenses) — it is gitignored. Keep it that way. Same for any `*.local.js` seed output.
-3. Deployment target is GitHub Pages, which is publicly reachable, so rules 1–2 are what keep the user's financial data private.
+3. The repo itself is now **public**, on top of the deployed site being public — so nothing checked into git can contain real figures. Never write actual totals, amounts, dates, or vendor names into CLAUDE.md, commit messages, code comments, or anywhere else that gets committed. Use placeholder figures in examples.
 4. Keep the Drive scope to `drive.file` only — never widen it to full Drive access.
 
 ## Deployment
