@@ -622,7 +622,7 @@ export default MSiteTracker;
 
 if (typeof document !== "undefined") {
   const container = document.getElementById("root");
-  if (container && !container.hasChildNodes()) {
+  if (container && !container.hasChildNodes() && !document.querySelector('script[src*="main.tsx"]')) {
     const root = createRoot(container);
     root.render(<MSiteTracker />);
   }
