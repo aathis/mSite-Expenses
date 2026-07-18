@@ -136,7 +136,7 @@ function MSiteTracker() {
       setDriveBusy(false);
       if (res.ok) {
         setLastBackup(res.at);
-        showToast("Backed up to Google Drive");
+        showToast(expenses.length + " expense" + (expenses.length === 1 ? "" : "s") + " backed up to Google Drive");
       } else {
         setDriveMessage(res.error || "Backup to Drive failed.");
       }
