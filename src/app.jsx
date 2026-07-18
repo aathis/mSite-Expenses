@@ -75,10 +75,6 @@ function MSiteTracker() {
   const [newCatMode, setNewCatMode] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
-  // Hidden one-time import, only reachable via ?seed in the URL.
-  // Generic code only — the data itself comes from a local file the user picks.
-  const seedMode = new URLSearchParams(window.location.search).has("seed");
-
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 2800);
@@ -213,39 +209,6 @@ function MSiteTracker() {
         setDriveMessage(res.error || "Restore from Drive failed.");
       }
     });
-  };
-
-  const importSeedFile = (file) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const raw = JSON.parse(reader.result);
-        const arr = Array.isArray(raw) ? raw : raw.expenses;
-        if (!Array.isArray(arr)) throw new Error("bad shape");
-        let sum = 0;
-        const items = arr
-          .map((r, i) => ({
-            id: r.id || "seed-" + Date.now() + "-" + i,
-            date: (r.date || "").trim(),
-            paidTo: (r.paidTo || r.paid_to || "").trim(),
-            amount: parseFloat(r.amount),
-            category: (r.category || "").trim() || "Misc & Tips",
-            notes: (r.notes || "").trim(),
-          }))
-          .filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.paidTo && !isNaN(e.amount));
-        if (items.length === 0) {
-          setError("No valid entries found in that file.");
-          return;
-        }
-        items.forEach((e) => (sum += e.amount));
-        setError("");
-        persist([...(expenses || []), ...items]);
-        showToast(items.length + " expenses imported — " + inr(sum));
-      } catch (e) {
-        setError("Could not read that file. It should be the JSON seed file.");
-      }
-    };
-    reader.readAsText(file);
   };
 
   const addExpense = () => {
@@ -459,26 +422,6 @@ function MSiteTracker() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
-              </>
-            )}
-
-            {seedMode && (
-              <>
-                <div style={S.sectionLabel}>ONE-TIME IMPORT</div>
-                <div style={{ ...S.card, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    type="file"
-                    accept=".json,application/json"
-                    onChange={(e) => {
-                      const f = e.target.files && e.target.files[0];
-                      if (f) importSeedFile(f);
-                      e.target.value = "";
-                    }}
-                  />
-                  <div style={{ flexBasis: "100%", fontSize: 12.5, color: GREY, lineHeight: 1.5 }}>
-                    Pick the seed JSON file to load your records. If Drive is connected, they back up automatically. Remove ?seed from the address to hide this.
-                  </div>
                 </div>
               </>
             )}

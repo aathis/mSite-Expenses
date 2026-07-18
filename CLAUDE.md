@@ -21,7 +21,7 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 - `src/drive.js` handles sign-in (Google Identity Services token client) and backup (Drive REST API v3, `appDataFolder` — a hidden per-app folder, invisible in the user's normal Drive UI). One file is created once, then updated in place on every change (never a new file per backup).
 - Backups are best-effort and non-blocking: if offline or the token needs re-consent, `persist()` still saves to localStorage; the UI just shows a small inline message rather than failing the save.
 - **Auto-sync on open**: when connected, the app pulls the Drive backup on every load and reconciles — empty local adopts Drive, empty Drive gets the local copy pushed up, and when both sides have data the newer one (Drive `savedAt` vs the `msite-local-modified` localStorage timestamp) wins. This is what makes the same data appear on any device after sign-in. Neither side can silently wipe the other; "Back up now" also refuses to run from an empty device.
-- **Hidden one-time import**: adding `?seed` to the URL shows a pick-a-JSON-file import card (generic code only — no personal data in the build). Used once with the seed file from `scripts/seed-local-data.mjs`; kept for emergencies.
+- The user's 191 historical records were seeded once (July 2026) via a temporary `?seed` import card that has since been **removed along with `scripts/seed-local-data.mjs`** — the Drive backup is now the single recovery path. If a bulk import is ever needed again, both are in git history.
 - Google Cloud project: "mSite Expenses" (project ID `msite-expenses`), OAuth consent screen in Testing mode with the owner as the only test user. The Client ID's authorized JavaScript origins need updating whenever the deployment URL changes (currently only `http://localhost:8000` is registered — add the real GitHub Pages URL once deployed).
 
 ## Build & run
@@ -35,10 +35,6 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 4. **Google Drive auto-backup**: see above — this replaces CSV import/export as the backup mechanism.
 5. Empty state on first run prompting the user to add their first expense.
 
-## One-time personal data seed (not a general app feature)
-- `scripts/seed-local-data.mjs` converts `data/msite-expenses.csv` (the user's real 191-row export, gitignored) into a browser console script the user pastes once into DevTools on their own device, against the real deployed origin, to seed their existing records into localStorage.
-- Output must go outside the repo (or to a `*.local.js` path, gitignored) — never commit it, never deploy it. This is a personal one-off, not an in-app import feature.
-
 ## Fixed starting categories
 Mestri, Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, Cement, Hollow blocks, Water tanker, Wood work, Sand & Jelly, Misc & Tips. Custom categories are allowed and appear automatically once used.
 
@@ -50,8 +46,8 @@ Mestri, Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, Cement,
 - Responsive: single column, max-width 860px centered; form uses a 2-column grid that collapses under 480px. Must work well on phones and desktop.
 
 ## PRIVACY RULES (critical — do not break)
-1. The built `index.html` must NEVER contain the user's personal expense data. The app ships empty; data only enters via the Add Expense form (or the one-time personal seed, run locally). Data stays in localStorage, mirrored only to the user's own Drive appDataFolder.
-2. Never commit `data/` (the CSV with real expenses) — it is gitignored. Keep it that way. Same for any `*.local.js` seed output.
+1. The built `index.html` must NEVER contain the user's personal expense data. The app ships empty; data only enters via the Add Expense form (or a restore from the user's own Drive backup). Data stays in localStorage, mirrored only to the user's own Drive appDataFolder.
+2. Never commit `data/` (the CSV with real expenses) — it is gitignored. Keep it that way. Same for any `*.local.*` seed output.
 3. The repo itself is now **public**, on top of the deployed site being public — so nothing checked into git can contain real figures. Never write actual totals, amounts, dates, or vendor names into CLAUDE.md, commit messages, code comments, or anywhere else that gets committed. Use placeholder figures in examples.
 4. Keep the Drive scope to `drive.appdata` only — never widen it to full Drive access.
 
