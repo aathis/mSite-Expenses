@@ -146,6 +146,21 @@ function MSiteTracker() {
   const [lastModified, setLastModified] = useState(() => localStorage.getItem(LOCAL_MODIFIED_KEY));
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [hoveredCat, setHoveredCat] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("msite-dark-mode") === "true";
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("msite-dark-mode", isDarkMode);
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark-theme");
+    } else {
+      document.documentElement.classList.remove("dark-theme");
+    }
+  }, [isDarkMode]);
 
   const today = new Date().toISOString().slice(0, 10);
   const [fDate, setFDate] = useState(today);
@@ -389,7 +404,7 @@ function MSiteTracker() {
     return (
       <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <style>{FONTS}</style>
-        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: GREY, letterSpacing: "0.08em" }}>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: "var(--color-text-grey)", letterSpacing: "0.08em" }}>
           LOADING SITE LEDGER…
         </div>
       </div>
@@ -406,11 +421,37 @@ function MSiteTracker() {
         <div style={S.hazard} aria-hidden="true" />
         {!selectedCategory && (
           <div className="headInner" style={S.headInner}>
-            <div style={{ padding: "20px 20px 16px" }}>
-              <div style={S.eyebrow}>M-SITE · CONSTRUCTION LEDGER</div>
-              <div style={S.totalRow}>
-                <span style={S.totalAmount}>{inr(total)}</span>
+            <div style={{ padding: "20px 20px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={S.eyebrow}>M-SITE · CONSTRUCTION LEDGER</div>
+                <div style={S.totalRow}>
+                  <span style={S.totalAmount}>{inr(total)}</span>
+                </div>
               </div>
+              <button
+                id="theme-toggle"
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "6px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "20px",
+                  lineHeight: 1,
+                  color: "var(--color-text)",
+                  transition: "background 0.2s, transform 0.2s",
+                  outline: "none",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-track)"; e.currentTarget.style.transform = "scale(1.1)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.transform = "scale(1)"; }}
+                title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              >
+                {isDarkMode ? "☀️" : "🌙"}
+              </button>
             </div>
             <div style={S.tabs}>
               {[
@@ -454,15 +495,15 @@ function MSiteTracker() {
                 padding: 0,
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: 12,
-                color: GREY,
+                color: "var(--color-text-grey)",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
                 marginBottom: 16,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = INK; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = GREY; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-grey)"; }}
             >
               ← BACK TO DASHBOARD
             </button>
@@ -473,14 +514,14 @@ function MSiteTracker() {
                 <span style={{ fontSize: 24, fontWeight: 700 }}>{selectedCategory}</span>
                 <span style={{ ...S.totalAmount, fontSize: 24, marginLeft: "auto" }}>{inr(catTotal)}</span>
               </div>
-              <div style={{ fontSize: 12.5, color: GREY, marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
+              <div style={{ fontSize: 12.5, color: "var(--color-text-grey)", marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
                 {catExpenses.length} entries matching this category
               </div>
             </div>
 
             <div style={S.sectionLabel}>TRANSACTIONS IN "{selectedCategory.toUpperCase()}"</div>
             {catExpenses.length === 0 ? (
-              <div style={{ ...S.card, color: GREY, fontSize: 14 }}>
+              <div style={{ ...S.card, color: "var(--color-text-grey)", fontSize: 14 }}>
                 No expenses found under this category.
               </div>
             ) : (
@@ -515,7 +556,7 @@ function MSiteTracker() {
                   <div style={{ ...S.card, textAlign: "center", padding: "36px 20px", marginTop: 18 }}>
                     <div style={{ fontSize: 34, marginBottom: 10 }}>🏗️</div>
                     <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>No expenses yet</div>
-                    <div style={{ color: GREY, fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>
+                    <div style={{ color: "var(--color-text-grey)", fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>
                       Add your first expense to get started.
                     </div>
                     <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
@@ -536,8 +577,8 @@ function MSiteTracker() {
                           onMouseLeave={() => setHoveredCat(null)}
                           style={{
                             cursor: "pointer",
-                            background: hoveredCat === c.name ? "#FBFAF7" : "transparent",
-                            border: "1px solid " + (hoveredCat === c.name ? "#D8D5CD" : "transparent"),
+                            background: hoveredCat === c.name ? "var(--color-input-bg)" : "transparent",
+                            border: "1px solid " + (hoveredCat === c.name ? "var(--color-border)" : "transparent"),
                             borderRadius: 6,
                             padding: "10px",
                             margin: i === byCategory.length - 1 ? "0 0 2px" : "0 0 10px",
@@ -545,7 +586,7 @@ function MSiteTracker() {
                           }}
                         >
                           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                            <span style={{ ...S.catName, textDecoration: hoveredCat === c.name ? "underline" : "none", color: hoveredCat === c.name ? INK : "inherit" }}>
+                            <span style={{ ...S.catName, textDecoration: hoveredCat === c.name ? "underline" : "none", color: hoveredCat === c.name ? "var(--color-text)" : "inherit" }}>
                               {c.name} →
                             </span>
                             <span style={S.catAmt}>{inr(c.value)}</span>
@@ -555,7 +596,7 @@ function MSiteTracker() {
                               style={{
                                 ...S.barFill,
                                 width: (c.value / byCategory[0].value) * 100 + "%",
-                                background: i === 0 ? YELLOW : INK,
+                                background: i === 0 ? YELLOW : "var(--color-text)",
                               }}
                             />
                           </div>
@@ -569,8 +610,8 @@ function MSiteTracker() {
                         <BarChart data={byMonth} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
                           <XAxis
                             dataKey="name"
-                            tick={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fill: GREY }}
-                            axisLine={{ stroke: "#D8D5CD" }}
+                            tick={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fill: isDarkMode ? "#A19C91" : "#8B8578" }}
+                            axisLine={{ stroke: isDarkMode ? "#3E3B35" : "#D8D5CD" }}
                             tickLine={false}
                             interval={0}
                             angle={-40}
@@ -583,14 +624,15 @@ function MSiteTracker() {
                             contentStyle={{
                               fontFamily: "'IBM Plex Mono', monospace",
                               fontSize: 12,
-                              border: "1px solid " + INK,
+                              border: "1px solid var(--color-text)",
                               borderRadius: 0,
-                              background: "#FFF",
+                              background: "var(--color-bg-card)",
+                              color: "var(--color-text)",
                             }}
                           />
                           <Bar dataKey="value" radius={[2, 2, 0, 0]}>
                             {byMonth.map((_, i) => (
-                              <Cell key={i} fill={INK} />
+                              <Cell key={i} fill={isDarkMode ? "#F2EFE9" : "#1D1B16"} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -711,7 +753,7 @@ function MSiteTracker() {
                 <div style={S.listSummary}>{filtered.length} entries · {inr(filteredTotal)}</div>
 
                 {filtered.length === 0 && (
-                  <div style={{ ...S.card, color: GREY, fontSize: 14 }}>
+                  <div style={{ ...S.card, color: "var(--color-text-grey)", fontSize: 14 }}>
                     {empty
                       ? "No expenses yet. Add one from the Add Expense tab."
                       : "No expenses match. Clear the search or pick another category."}
@@ -762,57 +804,83 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
 .formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 480px) { .formGrid { grid-template-columns: 1fr; gap: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+:root {
+  --color-bg-page: ${CONCRETE};
+  --color-text: ${INK};
+  --color-bg-card: #FFFFFF;
+  --color-border: #D8D5CD;
+  --color-text-grey: ${GREY};
+  --color-track: #EFEDE8;
+  --color-input-bg: #FBFAF7;
+  --color-input-border: #C9C5BB;
+  --color-notes: #5C574C;
+  --color-tab-border: #EDEBE5;
+}
+
+:root.dark-theme {
+  --color-bg-page: #121210;
+  --color-text: #F2EFE9;
+  --color-bg-card: #22201C;
+  --color-border: #3E3B35;
+  --color-text-grey: #A19C91;
+  --color-track: #32302A;
+  --color-input-bg: #2B2924;
+  --color-input-border: #4D4941;
+  --color-notes: #C4BFB4;
+  --color-tab-border: #2E2C27;
+}
 `;
 
 const S = {
-  page: { minHeight: "100vh", background: CONCRETE, color: INK, fontFamily: "'Space Grotesk', system-ui, sans-serif" },
-  header: { background: "#FFFFFF", borderBottom: "1px solid #D8D5CD", position: "sticky", top: 0, zIndex: 10 },
+  page: { minHeight: "100vh", background: "var(--color-bg-page)", color: "var(--color-text)", fontFamily: "'Space Grotesk', system-ui, sans-serif" },
+  header: { background: "var(--color-bg-card)", borderBottom: "1px solid var(--color-border)", position: "sticky", top: 0, zIndex: 10 },
   headInner: { maxWidth: 860, margin: "0 auto" },
   content: { padding: "0 16px 80px", maxWidth: 860, margin: "0 auto" },
-  hazard: { height: 8, background: `repeating-linear-gradient(45deg, ${YELLOW} 0 12px, ${INK} 12px 24px)` },
-  eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: GREY, marginBottom: 6 },
+  hazard: { height: 8, background: `repeating-linear-gradient(45deg, ${YELLOW} 0 12px, var(--color-text) 12px 24px)` },
+  eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: "var(--color-text-grey)", marginBottom: 6 },
   totalRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
   totalAmount: { fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 30, letterSpacing: "-0.01em" },
-  totalMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: GREY },
-  footer: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: GREY, textAlign: "center", marginTop: 40, marginBottom: 20 },
-  tabs: { display: "flex", borderTop: "1px solid #EDEBE5" },
+  totalMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)" },
+  footer: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)", textAlign: "center", marginTop: 40, marginBottom: 20 },
+  tabs: { display: "flex", borderTop: "1px solid var(--color-tab-border)" },
   tab: {
     flex: 1, padding: "12px 4px", background: "none", border: "none",
     borderBottom: "3px solid transparent", fontFamily: "'Space Grotesk', sans-serif",
-    fontWeight: 500, fontSize: 14, color: GREY, cursor: "pointer",
+    fontWeight: 500, fontSize: 14, color: "var(--color-text-grey)", cursor: "pointer",
   },
-  tabActive: { color: INK, borderBottom: "3px solid " + YELLOW, fontWeight: 700 },
-  sectionLabel: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: GREY, margin: "18px 2px 8px" },
-  card: { background: "#FFFFFF", border: "1px solid #D8D5CD", borderRadius: 6, padding: 16 },
+  tabActive: { color: "var(--color-text)", borderBottom: "3px solid " + YELLOW, fontWeight: 700 },
+  sectionLabel: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: "var(--color-text-grey)", margin: "18px 2px 8px" },
+  card: { background: "var(--color-bg-card)", border: "1px solid var(--color-border)", borderRadius: 6, padding: 16 },
   statusDot: { width: 9, height: 9, borderRadius: "50%", display: "inline-block", flexShrink: 0 },
   catName: { fontSize: 13.5, fontWeight: 500 },
   catAmt: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600 },
-  barTrack: { height: 6, background: "#EFEDE8", borderRadius: 3, overflow: "hidden" },
+  barTrack: { height: 6, background: "var(--color-track)", borderRadius: 3, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 3, transition: "width 0.4s ease" },
   formLabel: {
     fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.12em",
-    color: GREY, textTransform: "uppercase", margin: "14px 0 6px",
+    color: "var(--color-text-grey)", textTransform: "uppercase", margin: "14px 0 6px",
   },
   input: {
     width: "100%", padding: "11px 12px", fontSize: 15,
-    fontFamily: "'Space Grotesk', sans-serif", border: "1px solid #C9C5BB",
-    borderRadius: 5, background: "#FBFAF7", color: INK,
+    fontFamily: "'Space Grotesk', sans-serif", border: "1px solid var(--color-input-border)",
+    borderRadius: 5, background: "var(--color-input-bg)", color: "var(--color-text)",
   },
   chipWrap: { display: "flex", flexWrap: "wrap", gap: 7 },
   chip: {
     padding: "7px 11px", fontSize: 12.5, fontFamily: "'Space Grotesk', sans-serif",
-    fontWeight: 500, border: "1px solid #C9C5BB", borderRadius: 999,
-    background: "#FBFAF7", color: INK, cursor: "pointer",
+    fontWeight: 500, border: "1px solid var(--color-input-border)", borderRadius: 999,
+    background: "var(--color-input-bg)", color: "var(--color-text)", cursor: "pointer",
   },
-  chipActive: { background: INK, color: YELLOW, border: "1px solid " + INK, fontWeight: 700 },
+  chipActive: { background: "var(--color-text)", color: YELLOW, border: "1px solid var(--color-text)", fontWeight: 700 },
   primaryBtn: {
     width: "100%", marginTop: 20, padding: "13px", fontSize: 15, fontWeight: 700,
     fontFamily: "'Space Grotesk', sans-serif", background: YELLOW, color: INK,
-    border: "1px solid " + INK, borderRadius: 6, cursor: "pointer",
+    border: "1px solid var(--color-text)", borderRadius: 6, cursor: "pointer",
   },
   ghostBtn: {
     padding: "9px 14px", fontSize: 13, fontFamily: "'Space Grotesk', sans-serif",
-    background: "none", border: "1px solid #C9C5BB", borderRadius: 5, color: INK, cursor: "pointer",
+    background: "none", border: "1px solid var(--color-input-border)", borderRadius: 5, color: "var(--color-text)", cursor: "pointer",
   },
   dangerBtn: {
     padding: "8px 14px", fontSize: 13, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
@@ -820,16 +888,16 @@ const S = {
   },
   deleteLink: {
     marginTop: 4, padding: 0, background: "none", border: "none", fontSize: 12,
-    fontFamily: "'IBM Plex Mono', monospace", color: GREY, cursor: "pointer", textDecoration: "underline",
+    fontFamily: "'IBM Plex Mono', monospace", color: "var(--color-text-grey)", cursor: "pointer", textDecoration: "underline",
   },
-  listSummary: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: GREY, margin: "0 2px 10px" },
+  listSummary: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)", margin: "0 2px 10px" },
   row: {
-    display: "flex", alignItems: "flex-start", background: "#FFFFFF",
-    border: "1px solid #D8D5CD", borderRadius: 6, padding: "12px 14px", marginBottom: 8,
+    display: "flex", alignItems: "flex-start", background: "var(--color-bg-card)",
+    border: "1px solid var(--color-border)", borderRadius: 6, padding: "12px 14px", marginBottom: 8,
   },
   rowTitle: { fontSize: 14.5, fontWeight: 500, lineHeight: 1.35 },
-  rowMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: GREY, marginTop: 3 },
-  rowNotes: { fontSize: 12.5, color: "#5C574C", marginTop: 4, lineHeight: 1.4 },
+  rowMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "var(--color-text-grey)", marginTop: 3 },
+  rowNotes: { fontSize: 12.5, color: "var(--color-notes)", marginTop: 4, lineHeight: 1.4 },
   errorBox: {
     display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
     background: "#FBEAE9", border: "1px solid #B3261E", color: "#7A1712",
@@ -838,7 +906,7 @@ const S = {
   errorClose: { background: "none", border: "none", color: "#7A1712", cursor: "pointer", fontSize: 14, flexShrink: 0 },
   toast: {
     position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
-    background: INK, color: YELLOW, fontFamily: "'IBM Plex Mono', monospace",
+    background: "var(--color-text)", color: YELLOW, fontFamily: "'IBM Plex Mono', monospace",
     fontSize: 13, padding: "10px 18px", borderRadius: 6, zIndex: 100,
     boxShadow: "0 4px 14px rgba(0,0,0,0.25)", maxWidth: "92vw", textAlign: "center",
   },
