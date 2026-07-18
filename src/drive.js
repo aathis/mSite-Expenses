@@ -173,14 +173,24 @@ export async function restoreFromDrive() {
   try {
     const token = await ensureToken();
     const fileId = await findExistingFileId(token);
-    if (!fileId) return { ok: false, error: "No backup found in Drive yet." };
+    if (!fileId) return { ok: false, notFound: true, error: "No backup found in Drive yet." };
     const res = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
       { headers: { Authorization: "Bearer " + token } }
     );
-    if (!res.ok) throw await googleApiError(res, "Could not read the Drive backup file.");
+    if (!res.ok) {
+      if (res.status === 404) {
+        localStorage.removeItem(FILE_ID_KEY);
+        return { ok: false, notFound: true, error: "No backup found in Drive yet." };
+      }
+      throw await googleApiError(res, "Could not read the Drive backup file.");
+    }
     const data = await res.json();
-    return { ok: true, expenses: Array.isArray(data.expenses) ? data.expenses : [] };
+    return {
+      ok: true,
+      expenses: Array.isArray(data.expenses) ? data.expenses : [],
+      savedAt: data.savedAt || null,
+    };
   } catch (e) {
     return { ok: false, error: e.message || "Restore from Drive failed." };
   }

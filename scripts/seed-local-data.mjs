@@ -1,14 +1,13 @@
-// Personal one-time helper: converts data/msite-expenses.csv into a browser
-// console script that seeds localStorage with your existing expense records.
-// This script is NOT part of the built app and never runs in the browser —
-// it only runs locally, on demand, via `node scripts/seed-local-data.mjs`.
-// The CSV it reads is gitignored and the output must never be committed
-// or deployed; it contains your real expense data.
+// Personal one-time helper: converts data/msite-expenses.csv into a JSON
+// seed file for the app's hidden ?seed import (pick-a-file, no DevTools).
+// This script is NOT part of the built app — it only runs locally via
+// `node scripts/seed-local-data.mjs [output-path]`. The CSV it reads is
+// gitignored and the output must never be committed or deployed; it
+// contains real expense data.
 import { readFileSync, writeFileSync } from "fs";
 
-const STORAGE_KEY = "msite-construction-expenses-v1";
 const CSV_PATH = "data/msite-expenses.csv";
-const OUT_PATH = process.argv[2] || "seed-console-script.local.js";
+const OUT_PATH = process.argv[2] || "msite-seed.local.json";
 
 function parseCsv(text) {
   const rows = [];
@@ -50,18 +49,6 @@ const expenses = rows.slice(1).map((r, i) => ({
   notes: (r[idx("notes")] || "").trim(),
 })).filter((e) => e.date && e.paidTo && !isNaN(e.amount));
 
-const script = `// One-time seed: paste this into your browser's DevTools Console while
-// the M-Site Expense Tracker tab is open, then press Enter, then reload the page.
-// This only writes to THIS browser's local storage — nothing is sent anywhere.
-(function () {
-  var existing = [];
-  try { existing = JSON.parse(localStorage.getItem(${JSON.stringify(STORAGE_KEY)})) || []; } catch (e) {}
-  var seed = ${JSON.stringify(expenses)};
-  localStorage.setItem(${JSON.stringify(STORAGE_KEY)}, JSON.stringify(existing.concat(seed)));
-  console.log("Seeded " + seed.length + " expenses. Reload the page now.");
-})();
-`;
-
-writeFileSync(OUT_PATH, script);
+writeFileSync(OUT_PATH, JSON.stringify(expenses, null, 1));
 console.log(`Wrote ${expenses.length} expenses to ${OUT_PATH}`);
 console.log("This file contains your real financial data — do not commit or share it.");
