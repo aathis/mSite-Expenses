@@ -618,5 +618,12 @@ const S = {
   },
 };
 
-const root = createRoot(document.getElementById("root"));
-root.render(<MSiteTracker />);
+export default MSiteTracker;
+
+if (typeof document !== "undefined") {
+  const container = document.getElementById("root");
+  if (container && !container.hasChildNodes()) {
+    const root = createRoot(container);
+    root.render(<MSiteTracker />);
+  }
+}
