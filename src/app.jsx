@@ -94,6 +94,8 @@ function MSiteTracker() {
   const [driveBusy, setDriveBusy] = useState(false);
   const [driveMessage, setDriveMessage] = useState("");
   const [lastBackup, setLastBackup] = useState(getLastBackupTime());
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [hoveredCat, setHoveredCat] = useState(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const [fDate, setFDate] = useState(today);
@@ -264,6 +266,17 @@ function MSiteTracker() {
       .sort((a, b) => b.value - a.value);
   }, [expenses]);
 
+  const catExpenses = useMemo(() => {
+    if (!selectedCategory) return [];
+    return (expenses || [])
+      .filter((e) => e.category === selectedCategory)
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [expenses, selectedCategory]);
+
+  const catTotal = useMemo(() => {
+    return catExpenses.reduce((s, e) => s + e.amount, 0);
+  }, [catExpenses]);
+
   const byMonth = useMemo(() => {
     const m = {};
     (expenses || []).forEach((e) => {
@@ -331,7 +344,7 @@ function MSiteTracker() {
             ].map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => setTab(key)}
+                onClick={() => { setTab(key); setSelectedCategory(null); }}
                 style={{ ...S.tab, ...(tab === key ? S.tabActive : {}) }}
               >
                 {label}
@@ -352,7 +365,69 @@ function MSiteTracker() {
         {/* ---------- DASHBOARD ---------- */}
         {tab === "dashboard" && (
           <div>
-            {empty ? (
+            {selectedCategory ? (
+              <div style={{ marginTop: 18 }}>
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: 12,
+                    color: GREY,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 16,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = INK; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = GREY; }}
+                >
+                  ← BACK TO DASHBOARD
+                </button>
+
+                <div style={{ ...S.card, marginBottom: 18, borderLeft: "4px solid " + YELLOW }}>
+                  <div style={S.eyebrow}>CATEGORY DETAILED REPORT</div>
+                  <div style={{ ...S.totalRow, marginTop: 4 }}>
+                    <span style={{ fontSize: 24, fontWeight: 700 }}>{selectedCategory}</span>
+                    <span style={{ ...S.totalAmount, fontSize: 24, marginLeft: "auto" }}>{inr(catTotal)}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: GREY, marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
+                    {catExpenses.length} entries matching this category
+                  </div>
+                </div>
+
+                <div style={S.sectionLabel}>TRANSACTIONS IN "{selectedCategory.toUpperCase()}"</div>
+                {catExpenses.length === 0 ? (
+                  <div style={{ ...S.card, color: GREY, fontSize: 14 }}>
+                    No expenses found under this category.
+                  </div>
+                ) : (
+                  catExpenses.map((e) => (
+                    <div key={e.id} style={S.row}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
+                        <div style={S.rowMeta}>{fmtDate(e.date)}</div>
+                        {e.paidTo && e.notes && <div style={S.rowNotes}>{e.notes}</div>}
+                      </div>
+                      <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
+                        <div style={S.rowAmt}>{inr(e.amount)}</div>
+                        {confirmId === e.id ? (
+                          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                            <button style={S.dangerBtn} onClick={() => deleteExpense(e.id)}>Delete</button>
+                            <button style={S.ghostBtn} onClick={() => setConfirmId(null)}>✕</button>
+                          </div>
+                        ) : (
+                          <button style={S.deleteLink} onClick={() => setConfirmId(e.id)}>Delete</button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : empty ? (
               <div style={{ ...S.card, textAlign: "center", padding: "36px 20px", marginTop: 18 }}>
                 <div style={{ fontSize: 34, marginBottom: 10 }}>🏗️</div>
                 <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>No expenses yet</div>
@@ -367,12 +442,28 @@ function MSiteTracker() {
               </div>
             ) : (
               <>
-                <div style={S.sectionLabel}>SPEND BY CATEGORY</div>
-                <div style={S.card}>
+                <div style={S.sectionLabel}>SPEND BY CATEGORY (TAP TO VIEW DETAILS)</div>
+                <div style={{ ...S.card, padding: "10px 14px" }}>
                   {byCategory.map((c, i) => (
-                    <div key={c.name} style={{ marginBottom: i === byCategory.length - 1 ? 0 : 14 }}>
+                    <div
+                      key={c.name}
+                      onClick={() => setSelectedCategory(c.name)}
+                      onMouseEnter={() => setHoveredCat(c.name)}
+                      onMouseLeave={() => setHoveredCat(null)}
+                      style={{
+                        cursor: "pointer",
+                        background: hoveredCat === c.name ? "#FBFAF7" : "transparent",
+                        border: "1px solid " + (hoveredCat === c.name ? "#D8D5CD" : "transparent"),
+                        borderRadius: 6,
+                        padding: "10px",
+                        margin: i === byCategory.length - 1 ? "0 0 2px" : "0 0 10px",
+                        transition: "all 0.15s ease-in-out",
+                      }}
+                    >
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={S.catName}>{c.name}</span>
+                        <span style={{ ...S.catName, textDecoration: hoveredCat === c.name ? "underline" : "none", color: hoveredCat === c.name ? INK : "inherit" }}>
+                          {c.name} →
+                        </span>
                         <span style={S.catAmt}>{inr(c.value)}</span>
                       </div>
                       <div style={S.barTrack}>
