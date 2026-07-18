@@ -123,6 +123,7 @@ function MSiteTracker() {
   const [driveBusy, setDriveBusy] = useState(false);
   const [driveMessage, setDriveMessage] = useState("");
   const [lastBackup, setLastBackup] = useState(getLastBackupTime());
+  const [lastModified, setLastModified] = useState(() => localStorage.getItem(LOCAL_MODIFIED_KEY));
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [hoveredCat, setHoveredCat] = useState(null);
 
@@ -141,9 +142,11 @@ function MSiteTracker() {
 
   const adoptExpenses = (next) => {
     setExpenses(next);
+    const now = new Date().toISOString();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      localStorage.setItem(LOCAL_MODIFIED_KEY, new Date().toISOString());
+      localStorage.setItem(LOCAL_MODIFIED_KEY, now);
+      setLastModified(now);
     } catch (e) {
       setError("Could not save data in this browser. Changes may not persist.");
     }
@@ -387,7 +390,6 @@ function MSiteTracker() {
               <div style={S.eyebrow}>M-SITE · CONSTRUCTION LEDGER</div>
               <div style={S.totalRow}>
                 <span style={S.totalAmount}>{inr(total)}</span>
-                <span style={S.totalMeta}>{expenses.length} entries</span>
               </div>
             </div>
             <div style={S.tabs}>
@@ -720,6 +722,11 @@ function MSiteTracker() {
             )}
           </>
         )}
+        {!selectedCategory && (
+          <div style={S.footer}>
+            total {expenses.length} {expenses.length === 1 ? "entry" : "entries"}{lastModified ? ` · last updated ${fmtDateTime(lastModified)}` : ""}
+          </div>
+        )}
       </div>
 
       {toast && <div style={S.toast}>{toast}</div>}
@@ -746,6 +753,7 @@ const S = {
   totalRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
   totalAmount: { fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 30, letterSpacing: "-0.01em" },
   totalMeta: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: GREY },
+  footer: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: GREY, textAlign: "center", marginTop: 40, marginBottom: 20 },
   tabs: { display: "flex", borderTop: "1px solid #EDEBE5" },
   tab: {
     flex: 1, padding: "12px 4px", background: "none", border: "none",
