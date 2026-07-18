@@ -16,7 +16,7 @@ const YELLOW = "#F5B700";
 const GREY = "#8B8578";
 
 const BASE_CATS = [
-  "Mestri (Velu)", "Electrical & Plumbing", "JCB & Tractor", "Paya & Digging",
+  "Mestri", "Electrical & Plumbing", "JCB & Tractor", "Paya & Digging",
   "Iron bars", "Cement", "Hollow blocks", "Water tanker", "Wood work",
   "Sand & Jelly", "Misc & Tips",
 ];

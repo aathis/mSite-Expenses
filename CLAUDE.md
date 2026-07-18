@@ -38,7 +38,7 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 - Output must go outside the repo (or to a `*.local.js` path, gitignored) — never commit it, never deploy it. This is a personal one-off, not an in-app import feature.
 
 ## Fixed starting categories
-Mestri (Velu), Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, Cement, Hollow blocks, Water tanker, Wood work, Sand & Jelly, Misc & Tips. Custom categories are allowed and appear automatically once used.
+Mestri, Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, Cement, Hollow blocks, Water tanker, Wood work, Sand & Jelly, Misc & Tips. Custom categories are allowed and appear automatically once used.
 
 ## Design system (keep consistent)
 - Construction-site aesthetic. Palette: concrete `#EAE8E3` page background, white cards, ink `#1D1B16`, safety-yellow accent `#F5B700`, grey `#8B8578`, danger `#B3261E`.
