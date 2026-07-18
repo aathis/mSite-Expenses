@@ -378,10 +378,9 @@ function MSiteTracker() {
   const startEditing = (e) => {
     setIsClosing(false);
     setEditingExpense(e);
-    setEditName(e.paidTo || "");
     setEditAmount(e.amount.toString());
     setEditDate(e.date);
-    setEditNotes(e.notes || "");
+    setEditNotes(e.notes || e.paidTo || "");
     setEditCat(e.category);
     setEditNewCatMode(false);
     setEditNewCatName("");
@@ -398,8 +397,8 @@ function MSiteTracker() {
       }
       cat = editNewCatName.trim();
     }
-    if (!editDate || isNaN(amt) || amt <= 0 || !editNotes.trim()) {
-      setEditError("Enter a date, an amount above zero, and a note describing the expense.");
+    if (!editDate || isNaN(amt) || amt <= 0) {
+      setEditError("Enter a date and an amount above zero.");
       return;
     }
     setEditError("");
@@ -408,7 +407,7 @@ function MSiteTracker() {
       if (e.id === editingExpense.id) {
         return {
           ...e,
-          paidTo: editName.trim(),
+          paidTo: e.paidTo || "",
           amount: amt,
           date: editDate,
           notes: editNotes.trim(),
@@ -422,6 +421,7 @@ function MSiteTracker() {
     closeBottomSheet();
     showToast("Expense updated");
   };
+
 
   const total = useMemo(
     () => (expenses || []).reduce((s, e) => s + e.amount, 0),
@@ -905,14 +905,6 @@ function MSiteTracker() {
               </div>
             )}
  
-            <div style={S.formLabel}>Name / Paid to</div>
-            <input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              placeholder="e.g. Mestri, Hardware items"
-              style={S.input}
-            />
- 
             <div className="formGrid" style={{ marginTop: 12 }}>
               <div>
                 <div style={S.formLabel}>Date</div>
@@ -964,13 +956,14 @@ function MSiteTracker() {
               />
             )}
  
-            <div style={S.formLabel}>Notes</div>
+            <div style={S.formLabel}>Additional notes (optional)</div>
             <input
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
-              placeholder="e.g. Paid via PhonePe"
+              placeholder="e.g. Paid via PhonePe, Invoice #12"
               style={S.input}
             />
+
  
             <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
               <button
@@ -997,12 +990,38 @@ function MSiteTracker() {
 }
 
 const FONTS = `
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap');
 * { box-sizing: border-box; }
 input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 1px; }
 .formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 480px) { .formGrid { grid-template-columns: 1fr; gap: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* White Calendar Picker Icon */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.2);
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
 
 /* Mobile Device Frame Desktop Wrapper */
 .device-viewport {
@@ -1113,16 +1132,17 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
 
 :root.dark-theme {
   --color-bg-page: #121210;
-  --color-text: #E5E2DA;
+  --color-text: #CECAC0;
   --color-bg-card: #1F1D19;
-  --color-border: #3A3731;
-  --color-text-grey: #9A958A;
-  --color-track: #2E2C26;
-  --color-input-bg: #26241F;
-  --color-input-border: #47433B;
-  --color-notes: #BBB6AA;
-  --color-tab-border: #2B2924;
+  --color-border: #35322C;
+  --color-text-grey: #8A857A;
+  --color-track: #2B2923;
+  --color-input-bg: #24221D;
+  --color-input-border: #3F3C34;
+  --color-notes: #A7A297;
+  --color-tab-border: #272520;
 }
+
 
 .expense-row {
   cursor: pointer;
