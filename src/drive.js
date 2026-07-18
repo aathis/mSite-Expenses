@@ -94,6 +94,16 @@ async function ensureToken() {
   return requestToken(""); // silent renewal; rejects if interactive consent is needed again
 }
 
+async function googleApiError(res, fallback) {
+  try {
+    const body = await res.json();
+    const msg = body?.error?.message;
+    return new Error(msg ? `${fallback} (${res.status}: ${msg})` : `${fallback} (HTTP ${res.status})`);
+  } catch (e) {
+    return new Error(`${fallback} (HTTP ${res.status})`);
+  }
+}
+
 async function findExistingFileId(token) {
   const cached = localStorage.getItem(FILE_ID_KEY);
   if (cached) return cached;
@@ -102,7 +112,7 @@ async function findExistingFileId(token) {
     "?spaces=appDataFolder&fields=files(id,name)" +
     "&q=" + encodeURIComponent(`name='${DRIVE_BACKUP_FILENAME}'`);
   const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
-  if (!res.ok) throw new Error("Could not check Google Drive for an existing backup.");
+  if (!res.ok) throw await googleApiError(res, "Could not check Google Drive for an existing backup.");
   const data = await res.json();
   return data.files?.[0]?.id || null;
 }
@@ -129,7 +139,7 @@ async function createBackupFile(token, content) {
       body,
     }
   );
-  if (!res.ok) throw new Error("Could not create the Drive backup file.");
+  if (!res.ok) throw await googleApiError(res, "Could not create the Drive backup file.");
   const data = await res.json();
   return data.id;
 }
@@ -148,7 +158,7 @@ async function updateBackupFile(token, fileId, content) {
   );
   if (!res.ok) {
     if (res.status === 404) localStorage.removeItem(FILE_ID_KEY);
-    throw new Error("Could not update the Drive backup file.");
+    throw await googleApiError(res, "Could not update the Drive backup file.");
   }
 }
 
@@ -163,7 +173,7 @@ export async function restoreFromDrive() {
       `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
       { headers: { Authorization: "Bearer " + token } }
     );
-    if (!res.ok) throw new Error("Could not read the Drive backup file.");
+    if (!res.ok) throw await googleApiError(res, "Could not read the Drive backup file.");
     const data = await res.json();
     return { ok: true, expenses: Array.isArray(data.expenses) ? data.expenses : [] };
   } catch (e) {
