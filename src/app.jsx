@@ -6,6 +6,7 @@ import {
   connectDrive,
   disconnectDrive,
   backupExpensesToDrive,
+  restoreFromDrive,
   getLastBackupTime,
 } from "./drive.js";
 
@@ -126,6 +127,39 @@ function MSiteTracker() {
     setLastBackup(null);
     setDriveMessage("");
     showToast("Google Drive disconnected");
+  };
+
+  const handleBackupNow = () => {
+    setDriveBusy(true);
+    setDriveMessage("");
+    backupExpensesToDrive(expenses).then((res) => {
+      setDriveBusy(false);
+      if (res.ok) {
+        setLastBackup(res.at);
+        showToast("Backed up to Google Drive");
+      } else {
+        setDriveMessage(res.error || "Backup to Drive failed.");
+      }
+    });
+  };
+
+  const handleRestoreFromDrive = () => {
+    setDriveBusy(true);
+    setDriveMessage("");
+    restoreFromDrive().then((res) => {
+      setDriveBusy(false);
+      if (res.ok) {
+        setExpenses(res.expenses);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(res.expenses));
+        } catch (e) {
+          setError("Could not save restored data in this browser.");
+        }
+        showToast(res.expenses.length + " expenses restored from Drive");
+      } else {
+        setDriveMessage(res.error || "Restore from Drive failed.");
+      }
+    });
   };
 
   const addExpense = () => {
@@ -347,10 +381,16 @@ function MSiteTracker() {
             <div style={{ ...S.card, display: "flex", gap: 10, flexWrap: "wrap" }}>
               {driveConnected ? (
                 <>
-                  <span style={{ fontSize: 13.5 }}>
+                  <span style={{ fontSize: 13.5, flexBasis: "100%" }}>
                     <strong>Connected.</strong>{" "}
                     {lastBackup ? "Last backup: " + fmtDateTime(lastBackup) : "Will back up on your next change."}
                   </span>
+                  <button style={S.ghostBtn} onClick={handleBackupNow} disabled={driveBusy}>
+                    {driveBusy ? "Working…" : "Back up now"}
+                  </button>
+                  <button style={S.ghostBtn} onClick={handleRestoreFromDrive} disabled={driveBusy}>
+                    {driveBusy ? "Working…" : "Restore from Drive"}
+                  </button>
                   <button style={{ ...S.ghostBtn, marginLeft: "auto" }} onClick={handleDisconnectDrive}>
                     Disconnect
                   </button>
