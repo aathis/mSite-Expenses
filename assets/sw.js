@@ -1,6 +1,6 @@
 // Network-first for page loads so new deploys show up immediately,
 // with the cached copy as an offline fallback.
-const CACHE = "msite-shell-v2";
+const CACHE = "msite-shell-BUILD_TIMESTAMP";
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();

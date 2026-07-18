@@ -31,12 +31,30 @@ const html = `<!DOCTYPE html>
 <body>
 <div id="root"></div>
 <script>${js}</script>
-<script>if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js");</script>
+<script>
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./sw.js").then(r=>{
+    r.update();
+    r.addEventListener("updatefound",()=>{
+      const w=r.installing;
+      if(w)w.addEventListener("statechange",()=>{
+        if(w.state==="activated")window.location.reload();
+      });
+    });
+  });
+  let ref=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    if(!ref){ref=true;window.location.reload();}
+  });
+}
+</script>
 </body>
 </html>`;
 mkdirSync("dist", { recursive: true });
 writeFileSync("dist/index.html", html);
-for (const f of ["manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png"]) {
+for (const f of ["manifest.webmanifest", "icon-192.png", "icon-512.png"]) {
   copyFileSync("assets/" + f, "dist/" + f);
 }
+const swContent = readFileSync("assets/sw.js", "utf8").replace("BUILD_TIMESTAMP", Date.now().toString());
+writeFileSync("dist/sw.js", swContent);
 console.log("Built dist/index.html —", Math.round(html.length / 1024), "KB (+ PWA assets)");

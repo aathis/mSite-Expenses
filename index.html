@@ -16,7 +16,26 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("/sw.js");
+        navigator.serviceWorker.register("/sw.js").then((r) => {
+          r.update();
+          r.addEventListener("updatefound", () => {
+            const w = r.installing;
+            if (w) {
+              w.addEventListener("statechange", () => {
+                if (w.state === "activated") {
+                  window.location.reload();
+                }
+              });
+            }
+          });
+        });
+        let ref = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (!ref) {
+            ref = true;
+            window.location.reload();
+          }
+        });
       }
     </script>
   </body>
