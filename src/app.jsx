@@ -470,10 +470,18 @@ function MSiteTracker() {
 
   if (!expenses) {
     return (
-      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="device-viewport">
         <style>{FONTS}</style>
-        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: "var(--color-text-grey)", letterSpacing: "0.08em" }}>
-          LOADING SITE LEDGER…
+        <div className="device-frame">
+          <div className="device-notch">
+            <div className="device-speaker" />
+            <div className="device-camera" />
+          </div>
+          <div className="device-screen" style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: "var(--color-text-grey)", letterSpacing: "0.08em" }}>
+              LOADING SITE LEDGER…
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -482,8 +490,21 @@ function MSiteTracker() {
   const empty = expenses.length === 0;
 
   return (
-    <div style={S.page}>
+    <div className="device-viewport">
       <style>{FONTS}</style>
+
+      <div className="device-badge">
+        <span className="device-badge-dot" />
+        <span>Mobile View · 412 × 824</span>
+      </div>
+
+      <div className="device-frame">
+        <div className="device-notch">
+          <div className="device-speaker" />
+          <div className="device-camera" />
+        </div>
+
+        <div className="device-screen" style={S.page}>
 
       <div style={selectedCategory ? { position: "sticky", top: 0, zIndex: 10 } : S.header}>
         <div style={S.hazard} aria-hidden="true" />
@@ -967,6 +988,8 @@ function MSiteTracker() {
       )}
 
       {toast && <div style={S.toast}>{toast}</div>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -978,6 +1001,137 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
 .formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 480px) { .formGrid { grid-template-columns: 1fr; gap: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Mobile Device Frame Desktop Wrapper */
+.device-viewport {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #0c0d10;
+  background-image: radial-gradient(circle at 50% 30%, #1e2028 0%, #0c0d10 75%);
+  padding: 24px 16px;
+  color: var(--color-text);
+  transition: background 0.3s ease;
+}
+
+.device-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #949086;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.device-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #22C55E;
+  box-shadow: 0 0 8px #22C55E;
+}
+
+.device-frame {
+  position: relative;
+  width: 412px;
+  height: 824px;
+  max-height: calc(100vh - 80px);
+  background-color: var(--color-bg-page);
+  border-radius: 40px;
+  box-shadow: 
+    0 25px 60px -15px rgba(0, 0, 0, 0.8), 
+    0 0 0 10px #1A1B20, 
+    0 0 0 11px rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.device-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 104px;
+  height: 20px;
+  background-color: #1A1B20;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.device-speaker {
+  width: 32px;
+  height: 3.5px;
+  border-radius: 2px;
+  background-color: #2C2D35;
+}
+
+.device-camera {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #0E0F14;
+  border: 1px solid #2C2D35;
+}
+
+.device-screen {
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  scroll-behavior: smooth;
+}
+
+.device-screen::-webkit-scrollbar {
+  width: 4px;
+}
+.device-screen::-webkit-scrollbar-track {
+  background: transparent;
+}
+.device-screen::-webkit-scrollbar-thumb {
+  background: var(--color-input-border);
+  border-radius: 4px;
+}
+
+@media (max-width: 639px) {
+  .device-viewport {
+    padding: 0;
+    background: none;
+    min-height: 100vh;
+  }
+  .device-badge {
+    display: none;
+  }
+  .device-frame {
+    width: 100%;
+    height: 100vh;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .device-notch {
+    display: none;
+  }
+}
 
 :root {
   --color-bg-page: ${CONCRETE};
@@ -1081,10 +1235,10 @@ input:focus, button:focus-visible { outline: 2px solid #F5B700; outline-offset: 
 `;
 
 const S = {
-  page: { minHeight: "100vh", background: "var(--color-bg-page)", color: "var(--color-text)", fontFamily: "'Space Grotesk', system-ui, sans-serif" },
+  page: { minHeight: "100%", background: "var(--color-bg-page)", color: "var(--color-text)", fontFamily: "'Space Grotesk', system-ui, sans-serif" },
   header: { background: "var(--color-bg-card)", borderBottom: "1px solid var(--color-border)", position: "sticky", top: 0, zIndex: 10 },
-  headInner: { maxWidth: 860, margin: "0 auto" },
-  content: { padding: "0 16px 80px", maxWidth: 860, margin: "0 auto" },
+  headInner: { maxWidth: "100%", margin: "0 auto" },
+  content: { padding: "0 16px 80px", maxWidth: "100%", margin: "0 auto" },
   hazard: { height: 8, background: `repeating-linear-gradient(45deg, ${YELLOW} 0 12px, var(--color-text) 12px 24px)` },
   eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.14em", color: "var(--color-text-grey)", marginBottom: 6 },
   totalRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
@@ -1153,18 +1307,18 @@ const S = {
   },
   errorClose: { background: "none", border: "none", color: "#7A1712", cursor: "pointer", fontSize: 14, flexShrink: 0 },
   toast: {
-    position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
+    position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)",
     background: "var(--color-text)", color: YELLOW, fontFamily: "'IBM Plex Mono', monospace",
-    fontSize: 13, padding: "10px 18px", borderRadius: 6, zIndex: 100,
-    boxShadow: "0 4px 14px rgba(0,0,0,0.25)", maxWidth: "92vw", textAlign: "center",
+    fontSize: 13, padding: "10px 18px", borderRadius: 6, zIndex: 1100,
+    boxShadow: "0 4px 14px rgba(0,0,0,0.25)", maxWidth: "90%", textAlign: "center", width: "max-content",
   },
   modalOverlay: {
-    position: "fixed",
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     backdropFilter: "blur(4px)",
     display: "flex",
     alignItems: "flex-end",
@@ -1179,13 +1333,14 @@ const S = {
     borderLeft: "1px solid var(--color-border)",
     borderRight: "1px solid var(--color-border)",
     width: "100%",
-    maxWidth: 600,
+    maxWidth: "100%",
     padding: "16px 20px 32px",
     boxShadow: "0 -8px 30px rgba(0, 0, 0, 0.25)",
     maxHeight: "85vh",
     overflowY: "auto",
   },
 };
+
 
 export default MSiteTracker;
 
