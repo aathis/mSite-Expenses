@@ -38,17 +38,13 @@ const fmtDate = (iso) => {
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 };
 
-const HIST_LABEL = { add: "ADDED", edit: "EDITED", delete: "DELETED" };
+const HIST_LABEL = { add: "Added", edit: "Updated", delete: "Deleted" };
 
-const histBadgeStyle = (action) => {
-  if (action === "delete") return { background: "#FBEAE9", color: "#7A1712", border: "1px solid #E4B4B0" };
-  if (action === "edit") return { background: "var(--color-track)", color: "var(--color-text-grey)", border: "1px solid var(--color-border)" };
-  return { background: YELLOW, color: INK, border: "1px solid " + YELLOW };
-};
+// Red for anything that took money back out of the total — the same meaning
+// red already carries on the delete button.
+const deltaColor = (d) => (d < 0 ? "#B3261E" : "var(--color-text)");
 
-const deltaColor = (d) => (d > 0 ? "var(--color-text)" : d < 0 ? "#1E8E3E" : "var(--color-text-grey)");
-
-const deltaLabel = (d) => (d === 0 ? "No change" : (d > 0 ? "+" : "−") + inr(Math.abs(d)));
+const deltaLabel = (d) => (d > 0 ? "+" : "−") + inr(Math.abs(d));
 
 const fmtDateTime = (iso) => {
   if (!iso) return "";
@@ -617,10 +613,14 @@ function MSiteTracker() {
       return e;
     });
 
+    // Editing only the notes or category leaves the grand total alone, and the
+    // log is a record of the total moving — so nothing to log in that case.
     const newTotal = total - editingExpense.amount + amt;
     persist(
       updatedExpenses,
-      updated ? [makeHistoryEntry("edit", updated, total, newTotal, editingExpense)] : []
+      updated && newTotal !== total
+        ? [makeHistoryEntry("edit", updated, total, newTotal, editingExpense)]
+        : []
     );
     closeBottomSheet();
     showToast("Expense updated");
@@ -683,9 +683,13 @@ function MSiteTracker() {
 
   const filteredTotal = filtered.reduce((s, e) => s + e.amount, 0);
 
-  // Newest change first, matching how the expenses list reads.
+  // Newest change first, matching how the expenses list reads. Anything that
+  // left the total untouched is not a change to show.
   const historyView = useMemo(
-    () => [...history].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)),
+    () =>
+      [...history]
+        .filter((h) => h.newTotal !== h.oldTotal)
+        .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)),
     [history]
   );
 
@@ -866,11 +870,11 @@ function MSiteTracker() {
                 <span style={{ ...S.totalAmount, fontSize: 24, marginLeft: "auto" }}>{inr(total)}</span>
               </div>
               <div style={{ fontSize: 12.5, color: "var(--color-text-grey)", marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
-                {historyView.length} changes recorded · total right now
+                {historyView.length} changes · total right now
               </div>
             </div>
 
-            <div style={S.sectionLabel}>EVERY CHANGE TO THE TOTAL</div>
+            <div style={S.sectionLabel}>HOW THE TOTAL REACHED THIS NUMBER</div>
             {historyView.length === 0 ? (
               <div style={{ ...S.card, color: "var(--color-text-grey)", fontSize: 14 }}>
                 No changes yet. Add an expense and it will show up here.
@@ -880,32 +884,21 @@ function MSiteTracker() {
                 const delta = h.newTotal - h.oldTotal;
                 return (
                   <div key={h.id} style={S.histRow}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ ...S.histBadge, ...histBadgeStyle(h.action) }}>
-                        {HIST_LABEL[h.action] || "CHANGED"}
-                      </span>
-                      <span style={{ ...S.rowMeta, marginTop: 0, marginLeft: "auto" }}>
+                    <div style={S.histTopLine}>
+                      <span style={S.histTotalBig}>{inr(h.newTotal)}</span>
+                      <span style={S.histWhen}>
                         {h.backfilled ? fmtDate(h.expenseDate) : fmtDateTime(h.at)}
                       </span>
                     </div>
 
-                    <div style={{ ...S.rowTitle, marginTop: 10 }}>{h.title}</div>
-                    <div style={S.rowMeta}>
-                      {h.category}
-                      {!h.backfilled && " · entry dated " + fmtDate(h.expenseDate)}
+                    <div style={S.histFromLine}>
+                      <span>was {inr(h.oldTotal)}</span>
+                      <span style={{ ...S.histDelta, color: deltaColor(delta) }}>{deltaLabel(delta)}</span>
                     </div>
 
-                    {h.action === "edit" && h.prevAmount !== null && h.prevAmount !== h.amount && (
-                      <div style={S.histNote}>
-                        Expense amount {inr(h.prevAmount)} → {inr(h.amount)}
-                      </div>
-                    )}
-
-                    <div style={S.histTotals}>
-                      <span style={S.histOld}>{inr(h.oldTotal)}</span>
-                      <span style={S.histArrow}>→</span>
-                      <span style={S.histNew}>{inr(h.newTotal)}</span>
-                      <span style={{ ...S.histDelta, color: deltaColor(delta) }}>{deltaLabel(delta)}</span>
+                    <div style={S.histWhy}>
+                      <span style={{ fontWeight: 700 }}>{HIST_LABEL[h.action] || "Changed"}</span>
+                      {" — " + h.title}
                     </div>
                   </div>
                 );
@@ -914,9 +907,9 @@ function MSiteTracker() {
 
             {historyView.some((h) => h.backfilled) && (
               <div style={{ ...S.card, marginTop: 14, fontSize: 12.5, color: "var(--color-text-grey)", lineHeight: 1.55 }}>
-                Older entries were added before this log existed, so there is no record of
-                the exact time they were typed in. They are rebuilt in date order from the
-                expense date, which gives the same running total.
+                Older changes show the expense date, because there is no record of the exact
+                time those entries were typed in. They are replayed in date order, so the
+                running total is still correct.
               </div>
             )}
           </div>
@@ -1027,12 +1020,12 @@ function MSiteTracker() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>Total change log</div>
                     <div style={{ fontSize: 12.5, color: "var(--color-text-grey)", lineHeight: 1.5, marginTop: 6 }}>
-                      See the old total and the new total for every expense you add, edit, or delete.
+                      See how the total changed, and which item changed it.
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, fontWeight: 600 }}>
-                      {history.length}
+                      {historyView.length}
                     </div>
                     <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--color-text-grey)" }}>
                       CHANGES
@@ -1637,20 +1630,23 @@ const S = {
     background: "var(--color-bg-card)", border: "1px solid var(--color-border)",
     borderRadius: 6, padding: "12px 14px", marginBottom: 8,
   },
-  histBadge: {
-    fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fontWeight: 600,
-    letterSpacing: "0.12em", padding: "3px 9px", borderRadius: 999,
+  histTopLine: { display: "flex", alignItems: "baseline", gap: 8 },
+  histTotalBig: {
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em",
   },
-  histNote: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: "var(--color-text-grey)", marginTop: 8 },
-  histTotals: {
-    display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap",
-    marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--color-border)",
-    fontFamily: "'IBM Plex Mono', monospace",
+  histWhen: {
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5,
+    color: "var(--color-text-grey)", marginLeft: "auto", flexShrink: 0,
   },
-  histOld: { fontSize: 13, color: "var(--color-text-grey)" },
-  histArrow: { fontSize: 12, color: "var(--color-text-grey)" },
-  histNew: { fontSize: 15, fontWeight: 600 },
+  histFromLine: {
+    display: "flex", alignItems: "baseline", gap: 8, marginTop: 3,
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)",
+  },
   histDelta: { fontSize: 12.5, fontWeight: 600, marginLeft: "auto" },
+  histWhy: {
+    fontSize: 13.5, lineHeight: 1.45, marginTop: 9, paddingTop: 9,
+    borderTop: "1px dashed var(--color-border)",
+  },
   row: {
     display: "flex", alignItems: "flex-start", background: "var(--color-bg-card)",
     border: "1px solid var(--color-border)", borderRadius: 6, padding: "12px 14px", marginBottom: 8,

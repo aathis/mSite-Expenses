@@ -39,7 +39,8 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 
 ## History / total change log
 - Reached from a "Total change log" card on the Dashboard (under the month chart). It opens as a full-page view like the category drill-down — header/tabs hidden, `pushState` so the phone back button returns to the dashboard.
-- Each entry records one change to the grand total: the action (`add` / `edit` / `delete`), the expense's title, category and date, the **old total, the new total and the delta**, plus the timestamp of the change. Edits also keep `prevAmount` so the row can show the expense amount before and after.
+- **The log is about the grand total, nothing else.** Each row shows the new total as the big number, `was <old total>` and the delta underneath, then one small line naming the item: `Added — <expense>` / `Deleted — <expense>` / `Updated — <expense>`. No category, no per-expense breakdown — the user asked for exactly this and no more.
+- A change that leaves the total untouched (editing only the notes or category) is deliberately **not** logged, and `historyView` also filters out any zero-delta entry.
 - Stored in localStorage under `msite-expense-history-v1` (separate key from the expenses themselves) and written by `persist(next, newEntries)` in `src/app.jsx`.
 - **Past entries are backfilled.** Expenses that existed before this feature have no record of when they were typed in, so `buildBackfillHistory()` replays them in expense-date order to recover the running total and marks them `backfilled: true` (the UI then shows the expense date instead of a clock time, and a short note explains this at the bottom of the list). Backfill runs only when the log is completely empty.
 - Backfilled entries use a **deterministic id** (`h-seed-<expenseId>`) so two devices can never seed the same old expense twice; live entries get a random id.
