@@ -189,6 +189,9 @@ export async function restoreFromDrive() {
     return {
       ok: true,
       expenses: Array.isArray(data.expenses) ? data.expenses : [],
+      // null (not []) means this backup predates the change log, so the caller
+      // knows to rebuild one locally instead of treating it as "no changes".
+      history: Array.isArray(data.history) ? data.history : null,
       savedAt: data.savedAt || null,
     };
   } catch (e) {
@@ -197,11 +200,15 @@ export async function restoreFromDrive() {
 }
 
 // Best-effort: never throws. Callers get back a status object instead.
-export async function backupExpensesToDrive(expenses) {
+export async function backupExpensesToDrive(expenses, history) {
   if (!isDriveConnected()) return { ok: false, skipped: true };
   try {
     const token = await ensureToken();
-    const content = JSON.stringify({ savedAt: new Date().toISOString(), expenses });
+    const content = JSON.stringify({
+      savedAt: new Date().toISOString(),
+      expenses,
+      history: Array.isArray(history) ? history : [],
+    });
     let fileId = await findExistingFileId(token);
     if (!fileId) {
       fileId = await createBackupFile(token, content);
