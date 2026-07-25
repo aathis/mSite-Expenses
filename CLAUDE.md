@@ -34,6 +34,18 @@ A personal web app for tracking house-construction expenses for "M-Site" (a self
 3. **Expenses list**: newest first, text search (paid-to/notes/category), category filter chips, filtered count + total, per-row delete with confirm step.
 4. **Google Drive auto-backup**: see above — this replaces CSV import/export as the backup mechanism.
 5. Empty state on first run prompting the user to add their first expense.
+6. **Edit expense**: tapping any row opens a bottom sheet to change date, amount, category and notes.
+7. **History (total change log)**: see below.
+
+## History / total change log
+- Reached from a "Total change log" card on the Dashboard (under the month chart). It opens as a full-page view like the category drill-down — header/tabs hidden, `pushState` so the phone back button returns to the dashboard.
+- **The log is about the grand total, nothing else.** Each row shows the new total as the big number, `was <old total>` and the delta underneath, then one small line naming the item: `Added — <expense>` / `Deleted — <expense>` / `Updated — <expense>`. No category, no per-expense breakdown — the user asked for exactly this and no more.
+- A change that leaves the total untouched (editing only the notes or category) is deliberately **not** logged, and `historyView` also filters out any zero-delta entry.
+- Stored in localStorage under `msite-expense-history-v1` (separate key from the expenses themselves) and written by `persist(next, newEntries)` in `src/app.jsx`.
+- **Past entries are backfilled.** Expenses that existed before this feature have no record of when they were typed in, so `buildBackfillHistory()` replays them in expense-date order to recover the running total and marks them `backfilled: true` (the UI then shows the expense date instead of a clock time, and a short note explains this at the bottom of the list). Backfill runs only when the log is completely empty.
+- Backfilled entries use a **deterministic id** (`h-seed-<expenseId>`) so two devices can never seed the same old expense twice; live entries get a random id.
+- The log rides along in the Drive backup file, which is now `{ savedAt, expenses, history }`. `restoreFromDrive()` returns `history: null` for older backups that predate the field, which is the signal to rebuild locally rather than treat it as "no changes".
+- On sync the two logs are **merged by union of ids** (`mergeHistories`), never replaced — a change logged on the phone and one logged on the laptop both survive, whichever side wins on the expenses themselves. Known limit: the stored old/new totals are the totals as seen on the device that made the change, so two devices editing while offline can show a jump.
 
 ## Fixed starting categories
 Mestri, Electrical & Plumbing, JCB & Tractor, Paya & Digging, Iron bars, Cement, Hollow blocks, Water tanker, Wood work, Sand & Jelly, Misc & Tips. Custom categories are allowed and appear automatically once used.
@@ -58,7 +70,6 @@ GitHub Pages, deployed via `.github/workflows/deploy.yml` (GitHub Actions builds
 `assets/` holds `manifest.webmanifest`, `sw.js` (network-first navigation with cache fallback for offline opens), and hazard-stripe icons (192/512). `scripts/build.mjs` copies them into `dist/` and injects the manifest link, apple-touch-icon, theme-color, and service-worker registration into the built HTML. The user installs it from Chrome's "Add to Home screen" for an app-icon experience on the phone.
 
 ## Roadmap ideas the user has not confirmed yet (ask before building)
-- Edit existing expense entries (currently only add/delete).
 - Simple passcode screen on app open.
 - Track pending/owed payments (e.g. amounts pending to contractors).
 

@@ -12,6 +12,7 @@ import {
 
 const STORAGE_KEY = "msite-construction-expenses-v1";
 const LOCAL_MODIFIED_KEY = "msite-local-modified";
+const HISTORY_KEY = "msite-expense-history-v1";
 const INK = "#1D1B16";
 const CONCRETE = "#EAE8E3";
 const YELLOW = "#F5B700";
@@ -36,6 +37,14 @@ const fmtDate = (iso) => {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 };
+
+const HIST_LABEL = { add: "Added", edit: "Updated", delete: "Deleted" };
+
+// Red for anything that took money back out of the total — the same meaning
+// red already carries on the delete button.
+const deltaColor = (d) => (d < 0 ? "#B3261E" : "var(--color-text)");
+
+const deltaLabel = (d) => (d > 0 ? "+" : "−") + inr(Math.abs(d));
 
 const fmtDateTime = (iso) => {
   if (!iso) return "";
@@ -141,6 +150,72 @@ function loadStored() {
   }
 }
 
+function loadHistory() {
+  try {
+    const v = localStorage.getItem(HISTORY_KEY);
+    const parsed = v ? JSON.parse(v) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+const expenseTitle = (e) => ((e.notes || e.paidTo || "").trim() || "Expense");
+
+const midnightIso = (date) => {
+  const d = new Date(date + "T00:00:00");
+  return isNaN(d.getTime()) ? new Date(0).toISOString() : d.toISOString();
+};
+
+// Builds a change log for expenses entered before this feature existed. There
+// is no record of when those were typed in, so the expense date stands in and
+// the entries are replayed oldest-first to recover the running total.
+function buildBackfillHistory(list) {
+  const sorted = [...list].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return String(a.id) < String(b.id) ? -1 : 1;
+  });
+  let running = 0;
+  return sorted.map((e) => {
+    const oldTotal = running;
+    running += e.amount;
+    return {
+      id: "h-seed-" + e.id,
+      at: midnightIso(e.date),
+      action: "add",
+      backfilled: true,
+      expenseId: e.id,
+      title: expenseTitle(e),
+      category: e.category,
+      expenseDate: e.date,
+      amount: e.amount,
+      prevAmount: null,
+      oldTotal,
+      newTotal: running,
+    };
+  });
+}
+
+// Union by id, so a change logged on the phone and one logged on the laptop
+// both survive a Drive sync. Backfilled entries carry a deterministic id, so
+// two devices can never seed the same old expense twice.
+function mergeHistories(a, b) {
+  const seen = new Map();
+  [...(a || []), ...(b || [])].forEach((h) => {
+    if (h && h.id && !seen.has(h.id)) seen.set(h.id, h);
+  });
+  return [...seen.values()].sort((x, y) => (x.at < y.at ? -1 : x.at > y.at ? 1 : 0));
+}
+
+// Nothing logged anywhere yet but expenses exist → reconstruct from the dates.
+function settleHistory(localHistory, driveHistory, expensesForBackfill) {
+  const merged = mergeHistories(localHistory, driveHistory);
+  if (merged.length === 0 && expensesForBackfill.length > 0) {
+    return buildBackfillHistory(expensesForBackfill);
+  }
+  return merged;
+}
+
 function MSiteTracker() {
   const [expenses, setExpenses] = useState(null);
   const [tab, setTab] = useState("dashboard");
@@ -155,6 +230,8 @@ function MSiteTracker() {
   const [lastBackup, setLastBackup] = useState(getLastBackupTime());
   const [lastModified, setLastModified] = useState(() => localStorage.getItem(LOCAL_MODIFIED_KEY));
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [hoveredCat, setHoveredCat] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
@@ -185,7 +262,7 @@ function MSiteTracker() {
   };
 
   const handleTouchEnd = (e) => {
-    if (touchStartX === null || touchStartY === null || editingExpense || selectedCategory) return;
+    if (touchStartX === null || touchStartY === null || editingExpense || selectedCategory || showHistory) return;
     if (e.changedTouches && e.changedTouches.length === 1) {
       const touchEndX = e.changedTouches[0].clientX;
       const touchEndY = e.changedTouches[0].clientY;
@@ -247,13 +324,38 @@ function MSiteTracker() {
     }
   };
 
+  const saveHistory = (next) => {
+    setHistory(next);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    } catch (e) {
+      // The expenses themselves are stored separately, so a full quota only
+      // stops the log from growing — it never blocks saving an expense.
+    }
+  };
+
+  const makeHistoryEntry = (action, expense, oldTotal, newTotal, prev) => ({
+    id: "h-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+    at: new Date().toISOString(),
+    action,
+    backfilled: false,
+    expenseId: expense.id,
+    title: expenseTitle(expense),
+    category: expense.category,
+    expenseDate: expense.date,
+    amount: expense.amount,
+    prevAmount: prev ? prev.amount : null,
+    oldTotal,
+    newTotal,
+  });
+
   // Decide which side is the source of truth and make both match.
   // Never lets an empty side silently wipe out a non-empty one.
-  const syncWithDrive = async (localExpenses) => {
+  const syncWithDrive = async (localExpenses, localHistory) => {
     const res = await restoreFromDrive();
     if (!res.ok && res.notFound) {
       if (localExpenses.length > 0) {
-        const up = await backupExpensesToDrive(localExpenses);
+        const up = await backupExpensesToDrive(localExpenses, localHistory);
         if (up.ok) setLastBackup(up.at);
       }
       return;
@@ -264,18 +366,29 @@ function MSiteTracker() {
     }
     const driveRaw = res.expenses || [];
     const { migrated: drive, changed: driveChanged } = migrateCategories(driveRaw);
+
+    // The log is a record of what happened, not a snapshot — both sides keep
+    // their entries no matter which side wins on the expenses themselves.
+    const winningExpenses = drive.length > 0 ? drive : localExpenses;
+    const settled = settleHistory(localHistory, res.history, winningExpenses);
+    // The merge only ever grows the log, so comparing counts is enough to tell
+    // which side is missing entries.
+    const localStale = settled.length !== localHistory.length;
+    const driveStale = !Array.isArray(res.history) || settled.length !== res.history.length;
+    if (localStale) saveHistory(settled);
+
     if (drive.length === 0 && localExpenses.length === 0) return;
     if (localExpenses.length === 0 && drive.length > 0) {
       adoptExpenses(drive);
       showToast(drive.length + " expenses loaded from Google Drive");
-      if (driveChanged) {
-        const up = await backupExpensesToDrive(drive);
+      if (driveChanged || driveStale) {
+        const up = await backupExpensesToDrive(drive, settled);
         if (up.ok) setLastBackup(up.at);
       }
       return;
     }
     if (drive.length === 0 && localExpenses.length > 0) {
-      const up = await backupExpensesToDrive(localExpenses);
+      const up = await backupExpensesToDrive(localExpenses, settled);
       if (up.ok) setLastBackup(up.at);
       return;
     }
@@ -284,12 +397,12 @@ function MSiteTracker() {
     if (driveNewer) {
       adoptExpenses(drive);
       showToast(drive.length + " expenses loaded from Google Drive");
-      if (driveChanged) {
-        const up = await backupExpensesToDrive(drive);
+      if (driveChanged || driveStale) {
+        const up = await backupExpensesToDrive(drive, settled);
         if (up.ok) setLastBackup(up.at);
       }
     } else {
-      const up = await backupExpensesToDrive(localExpenses);
+      const up = await backupExpensesToDrive(localExpenses, settled);
       if (up.ok) setLastBackup(up.at);
     }
   };
@@ -301,18 +414,23 @@ function MSiteTracker() {
     if (changed) {
       adoptExpenses(migrated);
     }
+    const storedHistory = loadHistory();
+    const startingHistory = settleHistory(storedHistory, null, migrated);
+    if (startingHistory.length !== storedHistory.length) {
+      saveHistory(startingHistory);
+    } else {
+      setHistory(startingHistory);
+    }
     if (isDriveConnected()) {
-      syncWithDrive(migrated);
+      syncWithDrive(migrated, startingHistory);
     }
   }, []);
 
   useEffect(() => {
     const handlePopState = (e) => {
-      if (e.state && typeof e.state.category === "string") {
-        setSelectedCategory(e.state.category);
-      } else {
-        setSelectedCategory(null);
-      }
+      const st = e.state || {};
+      setSelectedCategory(typeof st.category === "string" ? st.category : null);
+      setShowHistory(st.view === "history");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -346,12 +464,26 @@ function MSiteTracker() {
     }
   };
 
+  const openHistory = () => {
+    setShowHistory(true);
+    window.history.pushState({ view: "history" }, "");
+  };
+
+  const closeHistory = () => {
+    setShowHistory(false);
+    if (window.history.state && window.history.state.view === "history") {
+      window.history.back();
+    }
+  };
 
 
-  const persist = (next) => {
+
+  const persist = (next, newEntries = []) => {
+    const nextHistory = newEntries.length ? [...history, ...newEntries] : history;
+    if (newEntries.length) saveHistory(nextHistory);
     adoptExpenses(next);
     if (isDriveConnected()) {
-      backupExpensesToDrive(next).then((res) => {
+      backupExpensesToDrive(next, nextHistory).then((res) => {
         if (res.ok) {
           setLastBackup(res.at);
           setDriveMessage("");
@@ -369,7 +501,7 @@ function MSiteTracker() {
       .then(async () => {
         setDriveConnected(true);
         showToast("Google Drive connected");
-        await syncWithDrive(expenses || []);
+        await syncWithDrive(expenses || [], history);
         setDriveBusy(false);
       })
       .catch((e) => {
@@ -409,7 +541,10 @@ function MSiteTracker() {
       category: cat,
       notes: fNotes.trim(),
     };
-    persist([...expenses, entry]);
+    persist(
+      [...expenses, entry],
+      [makeHistoryEntry("add", entry, total, total + amt)]
+    );
     setFAmount(""); setFNotes(""); setFDate(today);
     setNewCatMode(false); setNewCatName("");
     showToast("Expense added — " + inr(amt));
@@ -417,7 +552,11 @@ function MSiteTracker() {
   };
 
   const deleteExpense = (id) => {
-    persist(expenses.filter((e) => e.id !== id));
+    const removed = expenses.find((e) => e.id === id);
+    persist(
+      expenses.filter((e) => e.id !== id),
+      removed ? [makeHistoryEntry("delete", removed, total, total - removed.amount)] : []
+    );
     setConfirmId(null);
     showToast("Expense deleted");
   };
@@ -458,9 +597,10 @@ function MSiteTracker() {
     }
     setEditError("");
 
+    let updated = null;
     const updatedExpenses = expenses.map((e) => {
       if (e.id === editingExpense.id) {
-        return {
+        updated = {
           ...e,
           paidTo: e.paidTo || "",
           amount: amt,
@@ -468,11 +608,20 @@ function MSiteTracker() {
           notes: editNotes.trim(),
           category: cat,
         };
+        return updated;
       }
       return e;
     });
 
-    persist(updatedExpenses);
+    // Editing only the notes or category leaves the grand total alone, and the
+    // log is a record of the total moving — so nothing to log in that case.
+    const newTotal = total - editingExpense.amount + amt;
+    persist(
+      updatedExpenses,
+      updated && newTotal !== total
+        ? [makeHistoryEntry("edit", updated, total, newTotal, editingExpense)]
+        : []
+    );
     closeBottomSheet();
     showToast("Expense updated");
   };
@@ -534,6 +683,16 @@ function MSiteTracker() {
 
   const filteredTotal = filtered.reduce((s, e) => s + e.amount, 0);
 
+  // Newest change first, matching how the expenses list reads. Anything that
+  // left the total untouched is not a change to show.
+  const historyView = useMemo(
+    () =>
+      [...history]
+        .filter((h) => h.newTotal !== h.oldTotal)
+        .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)),
+    [history]
+  );
+
   if (!expenses) {
     return (
       <div className="device-viewport">
@@ -551,6 +710,8 @@ function MSiteTracker() {
   }
 
   const empty = expenses.length === 0;
+  // Category detail and history both take over the whole screen.
+  const fullPage = Boolean(selectedCategory) || showHistory;
 
   return (
     <div className="device-viewport">
@@ -570,9 +731,9 @@ function MSiteTracker() {
         >
 
 
-      <div style={selectedCategory ? { position: "sticky", top: 0, zIndex: 10 } : S.header}>
+      <div style={fullPage ? { position: "sticky", top: 0, zIndex: 10 } : S.header}>
         <div style={S.hazard} aria-hidden="true" />
-        {!selectedCategory && (
+        {!fullPage && (
           <div className="headInner" style={S.headInner}>
             <div style={{ padding: "20px 20px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
@@ -619,6 +780,9 @@ function MSiteTracker() {
                     if (selectedCategory) {
                       closeCategory();
                     }
+                    if (showHistory) {
+                      closeHistory();
+                    }
                   }}
                   style={{ ...S.tab, ...(tab === key ? S.tabActive : {}) }}
                 >
@@ -642,19 +806,7 @@ function MSiteTracker() {
           <div style={{ marginTop: 18 }}>
             <button
               onClick={closeCategory}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 12,
-                color: "var(--color-text-grey)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 16,
-              }}
+              style={S.backLink}
               onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-grey)"; }}
             >
@@ -698,6 +850,67 @@ function MSiteTracker() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        ) : showHistory ? (
+          <div style={{ marginTop: 18 }}>
+            <button
+              onClick={closeHistory}
+              style={S.backLink}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-grey)"; }}
+            >
+              ← BACK TO DASHBOARD
+            </button>
+
+            <div style={{ ...S.card, marginBottom: 18, borderLeft: "4px solid " + YELLOW }}>
+              <div style={S.eyebrow}>TOTAL CHANGE LOG</div>
+              <div style={{ ...S.totalRow, marginTop: 4 }}>
+                <span style={{ fontSize: 24, fontWeight: 700 }}>History</span>
+                <span style={{ ...S.totalAmount, fontSize: 24, marginLeft: "auto" }}>{inr(total)}</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--color-text-grey)", marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
+                {historyView.length} changes · total right now
+              </div>
+            </div>
+
+            <div style={S.sectionLabel}>HOW THE TOTAL REACHED THIS NUMBER</div>
+            {historyView.length === 0 ? (
+              <div style={{ ...S.card, color: "var(--color-text-grey)", fontSize: 14 }}>
+                No changes yet. Add an expense and it will show up here.
+              </div>
+            ) : (
+              historyView.map((h) => {
+                const delta = h.newTotal - h.oldTotal;
+                return (
+                  <div key={h.id} style={S.histRow}>
+                    <div style={S.histTopLine}>
+                      <span style={S.histTotalBig}>{inr(h.newTotal)}</span>
+                      <span style={S.histWhen}>
+                        {h.backfilled ? fmtDate(h.expenseDate) : fmtDateTime(h.at)}
+                      </span>
+                    </div>
+
+                    <div style={S.histFromLine}>
+                      <span>was {inr(h.oldTotal)}</span>
+                      <span style={{ ...S.histDelta, color: deltaColor(delta) }}>{deltaLabel(delta)}</span>
+                    </div>
+
+                    <div style={S.histWhy}>
+                      <span style={{ fontWeight: 700 }}>{HIST_LABEL[h.action] || "Changed"}</span>
+                      {" — " + h.title}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            {historyView.some((h) => h.backfilled) && (
+              <div style={{ ...S.card, marginTop: 14, fontSize: 12.5, color: "var(--color-text-grey)", lineHeight: 1.55 }}>
+                Older changes show the expense date, because there is no record of the exact
+                time those entries were typed in. They are replayed in date order, so the
+                running total is still correct.
+              </div>
             )}
           </div>
         ) : (
@@ -797,6 +1010,29 @@ function MSiteTracker() {
                     </div>
                   </>
                 )}
+
+                <div style={S.sectionLabel}>HISTORY</div>
+                <div
+                  className="expense-row"
+                  style={{ ...S.card, display: "flex", alignItems: "center", gap: 12 }}
+                  onClick={openHistory}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>Total change log</div>
+                    <div style={{ fontSize: 12.5, color: "var(--color-text-grey)", lineHeight: 1.5, marginTop: 6 }}>
+                      See how the total changed, and which item changed it.
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, fontWeight: 600 }}>
+                      {historyView.length}
+                    </div>
+                    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--color-text-grey)" }}>
+                      CHANGES
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 20, color: "var(--color-text-grey)", flexShrink: 0 }}>›</span>
+                </div>
 
                 <div style={S.sectionLabel}>GOOGLE DRIVE BACKUP</div>
                 <div style={S.card}>
@@ -941,7 +1177,7 @@ function MSiteTracker() {
             )}
           </>
         )}
-        {!selectedCategory && (
+        {!fullPage && (
           <div style={S.footer}>
             <div>Total entries: {expenses.length}</div>
             {lastModified && <div style={{ marginTop: 4 }}>Last updated time: {fmtDateTime(lastModified)}</div>}
@@ -1384,6 +1620,33 @@ const S = {
     fontFamily: "'IBM Plex Mono', monospace", color: "var(--color-text-grey)", cursor: "pointer", textDecoration: "underline",
   },
   listSummary: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)", margin: "0 2px 10px" },
+  backLink: {
+    background: "none", border: "none", padding: 0,
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 12,
+    color: "var(--color-text-grey)", cursor: "pointer",
+    display: "flex", alignItems: "center", gap: 6, marginBottom: 16,
+  },
+  histRow: {
+    background: "var(--color-bg-card)", border: "1px solid var(--color-border)",
+    borderRadius: 6, padding: "12px 14px", marginBottom: 8,
+  },
+  histTopLine: { display: "flex", alignItems: "baseline", gap: 8 },
+  histTotalBig: {
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em",
+  },
+  histWhen: {
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5,
+    color: "var(--color-text-grey)", marginLeft: "auto", flexShrink: 0,
+  },
+  histFromLine: {
+    display: "flex", alignItems: "baseline", gap: 8, marginTop: 3,
+    fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "var(--color-text-grey)",
+  },
+  histDelta: { fontSize: 12.5, fontWeight: 600, marginLeft: "auto" },
+  histWhy: {
+    fontSize: 13.5, lineHeight: 1.45, marginTop: 9, paddingTop: 9,
+    borderTop: "1px dashed var(--color-border)",
+  },
   row: {
     display: "flex", alignItems: "flex-start", background: "var(--color-bg-card)",
     border: "1px solid var(--color-border)", borderRadius: 6, padding: "12px 14px", marginBottom: 8,
