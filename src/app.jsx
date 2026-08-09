@@ -221,8 +221,6 @@ function MSiteTracker() {
   const [tab, setTab] = useState("dashboard");
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [search, setSearch] = useState("");
-  const [filterCat, setFilterCat] = useState("All");
   const [confirmId, setConfirmId] = useState(null);
   const [driveConnected, setDriveConnected] = useState(isDriveConnected());
   const [driveBusy, setDriveBusy] = useState(false);
@@ -231,7 +229,6 @@ function MSiteTracker() {
   const [lastModified, setLastModified] = useState(() => localStorage.getItem(LOCAL_MODIFIED_KEY));
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [history, setHistory] = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
   const [hoveredCat, setHoveredCat] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
@@ -262,7 +259,7 @@ function MSiteTracker() {
   };
 
   const handleTouchEnd = (e) => {
-    if (touchStartX === null || touchStartY === null || editingExpense || selectedCategory || showHistory) return;
+    if (touchStartX === null || touchStartY === null || editingExpense || selectedCategory) return;
     if (e.changedTouches && e.changedTouches.length === 1) {
       const touchEndX = e.changedTouches[0].clientX;
       const touchEndY = e.changedTouches[0].clientY;
@@ -270,7 +267,7 @@ function MSiteTracker() {
       const deltaY = touchEndY - touchStartY;
 
       if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
-        const tabsOrder = ["dashboard", "add", "expenses"];
+        const tabsOrder = ["dashboard", "add", "history"];
         const currentIndex = tabsOrder.indexOf(tab);
 
         if (deltaX < 0 && currentIndex < tabsOrder.length - 1) {
@@ -430,7 +427,6 @@ function MSiteTracker() {
     const handlePopState = (e) => {
       const st = e.state || {};
       setSelectedCategory(typeof st.category === "string" ? st.category : null);
-      setShowHistory(st.view === "history");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -460,18 +456,6 @@ function MSiteTracker() {
   const closeCategory = () => {
     setSelectedCategory(null);
     if (window.history.state && window.history.state.category) {
-      window.history.back();
-    }
-  };
-
-  const openHistory = () => {
-    setShowHistory(true);
-    window.history.pushState({ view: "history" }, "");
-  };
-
-  const closeHistory = () => {
-    setShowHistory(false);
-    if (window.history.state && window.history.state.view === "history") {
       window.history.back();
     }
   };
@@ -548,7 +532,7 @@ function MSiteTracker() {
     setFAmount(""); setFNotes(""); setFDate(today);
     setNewCatMode(false); setNewCatName("");
     showToast("Expense added — " + inr(amt));
-    setTab("expenses");
+    setTab("history");
   };
 
   const deleteExpense = (id) => {
@@ -667,21 +651,9 @@ function MSiteTracker() {
     return [...BASE_CATS, ...extra];
   }, [expenses]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return (expenses || [])
-      .filter((e) => filterCat === "All" || e.category === filterCat)
-      .filter(
-        (e) =>
-          !q ||
-          e.paidTo.toLowerCase().includes(q) ||
-          (e.notes || "").toLowerCase().includes(q) ||
-          e.category.toLowerCase().includes(q)
-      )
-      .sort((a, b) => (a.date < b.date ? 1 : -1));
-  }, [expenses, search, filterCat]);
-
-  const filteredTotal = filtered.reduce((s, e) => s + e.amount, 0);
+  const sortedExpenses = useMemo(() => {
+    return [...(expenses || [])].sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [expenses]);
 
   // Newest change first, matching how the expenses list reads. Anything that
   // left the total untouched is not a change to show.
@@ -711,7 +683,7 @@ function MSiteTracker() {
 
   const empty = expenses.length === 0;
   // Category detail and history both take over the whole screen.
-  const fullPage = Boolean(selectedCategory) || showHistory;
+  const fullPage = Boolean(selectedCategory);
 
   return (
     <div className="device-viewport">
@@ -771,7 +743,7 @@ function MSiteTracker() {
               {[
                 ["dashboard", "Dashboard"],
                 ["add", "Add expense"],
-                ["expenses", "Expenses"],
+                ["history", "History Log"],
               ].map(([key, label]) => (
                 <button
                   key={key}
@@ -779,9 +751,6 @@ function MSiteTracker() {
                     setTab(key);
                     if (selectedCategory) {
                       closeCategory();
-                    }
-                    if (showHistory) {
-                      closeHistory();
                     }
                   }}
                   style={{ ...S.tab, ...(tab === key ? S.tabActive : {}) }}
@@ -850,67 +819,6 @@ function MSiteTracker() {
                   </div>
                 </div>
               ))
-            )}
-          </div>
-        ) : showHistory ? (
-          <div style={{ marginTop: 18 }}>
-            <button
-              onClick={closeHistory}
-              style={S.backLink}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-grey)"; }}
-            >
-              ← BACK TO DASHBOARD
-            </button>
-
-            <div style={{ ...S.card, marginBottom: 18, borderLeft: "4px solid " + YELLOW }}>
-              <div style={S.eyebrow}>TOTAL CHANGE LOG</div>
-              <div style={{ ...S.totalRow, marginTop: 4 }}>
-                <span style={{ fontSize: 24, fontWeight: 700 }}>History</span>
-                <span style={{ ...S.totalAmount, fontSize: 24, marginLeft: "auto" }}>{inr(total)}</span>
-              </div>
-              <div style={{ fontSize: 12.5, color: "var(--color-text-grey)", marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
-                {historyView.length} changes · total right now
-              </div>
-            </div>
-
-            <div style={S.sectionLabel}>HOW THE TOTAL REACHED THIS NUMBER</div>
-            {historyView.length === 0 ? (
-              <div style={{ ...S.card, color: "var(--color-text-grey)", fontSize: 14 }}>
-                No changes yet. Add an expense and it will show up here.
-              </div>
-            ) : (
-              historyView.map((h) => {
-                const delta = h.newTotal - h.oldTotal;
-                return (
-                  <div key={h.id} style={S.histRow}>
-                    <div style={S.histTopLine}>
-                      <span style={S.histTotalBig}>{inr(h.newTotal)}</span>
-                      <span style={S.histWhen}>
-                        {h.backfilled ? fmtDate(h.expenseDate) : fmtDateTime(h.at)}
-                      </span>
-                    </div>
-
-                    <div style={S.histFromLine}>
-                      <span>was {inr(h.oldTotal)}</span>
-                      <span style={{ ...S.histDelta, color: deltaColor(delta) }}>{deltaLabel(delta)}</span>
-                    </div>
-
-                    <div style={S.histWhy}>
-                      <span style={{ fontWeight: 700 }}>{HIST_LABEL[h.action] || "Changed"}</span>
-                      {" — " + h.title}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-
-            {historyView.some((h) => h.backfilled) && (
-              <div style={{ ...S.card, marginTop: 14, fontSize: 12.5, color: "var(--color-text-grey)", lineHeight: 1.55 }}>
-                Older changes show the expense date, because there is no record of the exact
-                time those entries were typed in. They are replayed in date order, so the
-                running total is still correct.
-              </div>
             )}
           </div>
         ) : (
@@ -1011,28 +919,7 @@ function MSiteTracker() {
                   </>
                 )}
 
-                <div style={S.sectionLabel}>HISTORY</div>
-                <div
-                  className="expense-row"
-                  style={{ ...S.card, display: "flex", alignItems: "center", gap: 12 }}
-                  onClick={openHistory}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>Total change log</div>
-                    <div style={{ fontSize: 12.5, color: "var(--color-text-grey)", lineHeight: 1.5, marginTop: 6 }}>
-                      See how the total changed, and which item changed it.
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, fontWeight: 600 }}>
-                      {historyView.length}
-                    </div>
-                    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--color-text-grey)" }}>
-                      CHANGES
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 20, color: "var(--color-text-grey)", flexShrink: 0 }}>›</span>
-                </div>
+
 
                 <div style={S.sectionLabel}>GOOGLE DRIVE BACKUP</div>
                 <div style={S.card}>
@@ -1124,55 +1011,58 @@ function MSiteTracker() {
               </div>
             )}
 
-            {/* ---------- EXPENSES ---------- */}
-            {tab === "expenses" && (
+            {/* ---------- EXPENSES / HISTORY ---------- */}
+            {tab === "history" && (
               <div style={{ marginTop: 18 }}>
-                <input
-                  value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by name, notes, or category"
-                  style={{ ...S.input, marginBottom: 10 }}
-                />
-                <div style={{ ...S.chipWrap, marginBottom: 12 }}>
-                  {["All", ...allCats].map((c) => (
-                    <button
-                      key={c} onClick={() => setFilterCat(c)}
-                      style={{ ...S.chip, ...(filterCat === c ? S.chipActive : {}) }}
-                    >
-                      {c}
-                    </button>
-                  ))}
+                <div style={{ ...S.card, marginBottom: 18, borderLeft: "4px solid " + YELLOW }}>
+                  <div style={S.eyebrow}>TOTAL CHANGE LOG</div>
+                  <div style={{ ...S.totalRow, marginTop: 4 }}>
+                    <span style={{ fontSize: 24, fontWeight: 700 }}>History</span>
+                    <span style={{ ...S.totalAmount, fontSize: 24, marginLeft: "auto" }}>{inr(total)}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--color-text-grey)", marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
+                    {historyView.length} changes · total right now
+                  </div>
                 </div>
 
-                <div style={S.listSummary}>{filtered.length} entries · {inr(filteredTotal)}</div>
-
-                {filtered.length === 0 && (
+                <div style={S.sectionLabel}>HOW THE TOTAL REACHED THIS NUMBER</div>
+                {historyView.length === 0 ? (
                   <div style={{ ...S.card, color: "var(--color-text-grey)", fontSize: 14 }}>
-                    {empty
-                      ? "No expenses yet. Add one from the Add Expense tab."
-                      : "No expenses match. Clear the search or pick another category."}
+                    No changes yet. Add an expense and it will show up here.
                   </div>
+                ) : (
+                  historyView.map((h) => {
+                    const delta = h.newTotal - h.oldTotal;
+                    return (
+                      <div key={h.id} style={S.histRow}>
+                        <div style={S.histTopLine}>
+                          <span style={S.histTotalBig}>{inr(h.newTotal)}</span>
+                          <span style={S.histWhen}>
+                            {h.backfilled ? fmtDate(h.expenseDate) : fmtDateTime(h.at)}
+                          </span>
+                        </div>
+
+                        <div style={S.histFromLine}>
+                          <span>was {inr(h.oldTotal)}</span>
+                          <span style={{ ...S.histDelta, color: deltaColor(delta) }}>{deltaLabel(delta)}</span>
+                        </div>
+
+                        <div style={S.histWhy}>
+                          <span style={{ fontWeight: 700 }}>{HIST_LABEL[h.action] || "Changed"}</span>
+                          {" — " + h.title}
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
 
-                {filtered.map((e) => (
-                  <div key={e.id} className="expense-row" style={S.row} onClick={() => startEditing(e)}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={S.rowTitle}>{e.paidTo || e.notes}</div>
-                      <div style={S.rowMeta}>{fmtDate(e.date)} · {e.category}</div>
-                      {e.paidTo && e.notes && <div style={S.rowNotes}>{e.notes}</div>}
-                    </div>
-                    <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
-                      <div style={S.rowAmt}>{inr(e.amount)}</div>
-                      {confirmId === e.id ? (
-                        <div style={{ display: "flex", gap: 6, marginTop: 6 }} onClick={(ev) => ev.stopPropagation()}>
-                          <button style={S.dangerBtn} onClick={(ev) => { ev.stopPropagation(); deleteExpense(e.id); }}>Delete</button>
-                          <button style={S.ghostBtn} onClick={(ev) => { ev.stopPropagation(); setConfirmId(null); }}>✕</button>
-                        </div>
-                      ) : (
-                        <button style={S.deleteLink} onClick={(ev) => { ev.stopPropagation(); setConfirmId(e.id); }}>Delete</button>
-                      )}
-                    </div>
+                {historyView.some((h) => h.backfilled) && (
+                  <div style={{ ...S.card, marginTop: 14, fontSize: 12.5, color: "var(--color-text-grey)", lineHeight: 1.55 }}>
+                    Older changes show the expense date, because there is no record of the exact
+                    time those entries were typed in. They are replayed in date order, so the
+                    running total is still correct.
                   </div>
-                ))}
+                )}
               </div>
             )}
           </>

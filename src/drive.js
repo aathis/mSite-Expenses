@@ -3,10 +3,12 @@ import { GOOGLE_CLIENT_ID, DRIVE_SCOPE, DRIVE_BACKUP_FILENAME } from "./config.j
 const CONNECTED_KEY = "msite-drive-connected";
 const FILE_ID_KEY = "msite-drive-backup-file-id";
 const LAST_BACKUP_KEY = "msite-drive-last-backup";
+const TOKEN_KEY = "msite-drive-token";
+const TOKEN_EXPIRY_KEY = "msite-drive-token-expires";
+const EMAIL_KEY = "msite-drive-email";
 
-let tokenClient = null;
-let accessToken = null;
-let tokenExpiresAt = 0;
+let accessToken = localStorage.getItem(TOKEN_KEY) || null;
+let tokenExpiresAt = Number(localStorage.getItem(TOKEN_EXPIRY_KEY)) || 0;
 
 function gisReady() {
   return typeof window !== "undefined" && window.google?.accounts?.oauth2;
@@ -28,33 +30,56 @@ function waitForGis(timeoutMs = 8000) {
   });
 }
 
-function getTokenClient() {
-  if (!tokenClient) {
-    tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: DRIVE_SCOPE,
-      callback: () => {},
+async function fetchUserEmail(token) {
+  try {
+    const res = await fetch("https://www.googleapis.com/drive/v3/about?fields=user", {
+      headers: { Authorization: "Bearer " + token }
     });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.user && data.user.emailAddress) {
+        localStorage.setItem(EMAIL_KEY, data.user.emailAddress);
+      }
+    }
+  } catch (e) {
+    // Ignore error, best effort to store email for future login_hint
   }
-  return tokenClient;
 }
 
 function requestToken(promptMode) {
   return new Promise((resolve, reject) => {
-    const client = getTokenClient();
-    client.callback = (resp) => {
-      if (resp && resp.access_token) {
-        accessToken = resp.access_token;
-        tokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 30000;
-        resolve(accessToken);
-      } else {
-        reject(new Error(resp?.error || "Google did not grant access."));
+    const hint = localStorage.getItem(EMAIL_KEY);
+    
+    const config = {
+      client_id: GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      prompt: promptMode,
+      callback: (resp) => {
+        if (resp && resp.access_token) {
+          accessToken = resp.access_token;
+          tokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 30000;
+          
+          localStorage.setItem(TOKEN_KEY, accessToken);
+          localStorage.setItem(TOKEN_EXPIRY_KEY, tokenExpiresAt.toString());
+          
+          fetchUserEmail(accessToken);
+          resolve(accessToken);
+        } else {
+          reject(new Error(resp?.error || "Google did not grant access."));
+        }
+      },
+      error_callback: (err) => {
+        reject(new Error(err?.type || "Google sign-in was cancelled or failed."));
       }
     };
-    client.error_callback = (err) => {
-      reject(new Error(err?.type || "Google sign-in was cancelled or failed."));
-    };
-    client.requestAccessToken({ prompt: promptMode });
+    
+    // Use login_hint if available and we're not explicitly requesting consent
+    if (hint && !promptMode) {
+      config.login_hint = hint;
+    }
+    
+    const client = window.google.accounts.oauth2.initTokenClient(config);
+    client.requestAccessToken();
   });
 }
 
@@ -85,6 +110,9 @@ export function disconnectDrive() {
   tokenExpiresAt = 0;
   localStorage.removeItem(CONNECTED_KEY);
   localStorage.removeItem(LAST_BACKUP_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_EXPIRY_KEY);
+  localStorage.removeItem(EMAIL_KEY);
   // Deliberately keep FILE_ID_KEY: it points at the same Drive file across
   // reconnects, so a future name-based re-search (which can't distinguish
   // duplicates well) is never needed unless the file is actually gone.
